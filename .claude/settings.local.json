@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node *)",
+      "Read(//Users/roshanrajendran/.claude/jobs/efba1a14/tmp/**)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --hide-scrollbars --window-size=1280,1000 --virtual-time-budget=3000 --screenshot=initial.png --enable-logging=stderr --v=1 \"file:///Users/roshanrajendran/Github/Braess-Paradox/index.html\")",
+      "Bash(python3 *)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --window-size=1280,1400 --virtual-time-budget=8000 --enable-logging=stderr --log-level=0 --screenshot=v3.png \"file:///Users/roshanrajendran/Github/Braess-Paradox/_shot.html#shortcut\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --window-size=1000,620 --virtual-time-budget=90000 --screenshot=v4_dots.png \"file:///Users/roshanrajendran/Github/Braess-Paradox/_shot.html#shortcut\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --window-size=1000,1400 --virtual-time-budget=120000 --screenshot=v5_dots.png \"file:///Users/roshanrajendran/Github/Braess-Paradox/_shot.html#shortcut\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --window-size=1000,1400 --virtual-time-budget=6000 --blink-settings=preferredColorScheme=1 --screenshot=v5_light.png \"file:///Users/roshanrajendran/Github/Braess-Paradox/_shot.html#removed\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --window-size=1100,1300 --virtual-time-budget=5000 --enable-logging=stderr --log-level=0 --screenshot=final.png \"file:///Users/roshanrajendran/Github/Braess-Paradox/index.html\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --window-size=1100,1300 --virtual-time-budget=4000 --enable-logging=stderr --log-level=0 --screenshot=final2.png \"file:///Users/roshanrajendran/Github/Braess-Paradox/index.html\")"
+    ]
+  }
+}
