@@ -18,14 +18,29 @@
       <section class="panel network-panel">
         <canvas id="network"></canvas>
         <div class="controls">
-          <button id="play" class="primary">▶ Play</button>
+          <button id="play" class="primary" aria-pressed="false">▶ Play</button>
           <button id="step">Step</button>
           <button id="reset">Reset</button>
           <button id="shortcut" class="shortcut">＋ Add shortcut A→B</button>
-          <label class="speed">
+        </div>
+        <div class="controls sliders">
+          <label class="slider">
             Rounds/sec
             <input id="speed" type="range" min="1" max="60" value="20" />
-            <span id="speed-value">20</span>
+            <span id="speed-value"></span>
+          </label>
+          <label class="slider">
+            Drivers
+            <input id="population" type="range" min="20" max="1000" step="20" value="100" />
+            <span id="population-value"></span>
+          </label>
+          <label class="slider theme-picker">
+            Theme
+            <select id="theme">
+              <option value="auto">Auto</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
           </label>
         </div>
       </section>
@@ -81,6 +96,7 @@
 
     <script src="js/graph.js"></script>
     <script src="js/simulation.js"></script>
+    <script src="js/clock.js"></script>
     <script src="js/render.js"></script>
     <script src="js/main.js"></script>
   </body>

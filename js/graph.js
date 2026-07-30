@@ -48,19 +48,35 @@ const ROUTE_DEFS = [
 
 class Graph {
   constructor(population) {
-    const coeff = CONGESTION_AT_FULL / population;
-    this.population = population;
     this.shortcutEnabled = false;
 
     this.edges = {
-      SA: { from: 'S', to: 'A', base: 0, coeff, congestible: true },
+      SA: { from: 'S', to: 'A', base: 0, coeff: 0, congestible: true },
       AT: { from: 'A', to: 'T', base: CONSTANT_COST, coeff: 0, congestible: false },
       SB: { from: 'S', to: 'B', base: CONSTANT_COST, coeff: 0, congestible: false },
-      BT: { from: 'B', to: 'T', base: 0, coeff, congestible: true },
+      BT: { from: 'B', to: 'T', base: 0, coeff: 0, congestible: true },
       AB: { from: 'A', to: 'B', base: 0, coeff: 0, congestible: false, shortcut: true },
     };
 
     this.routes = ROUTE_DEFS;
+    this.setPopulation(population);
+  }
+
+  /**
+   * Resize the population. The congestion coefficient is renormalized so the
+   * headline equilibria stay at 65 and 80 for any N (see the header comment) —
+   * i.e. N changes how granular the game is, never what it converges to.
+   *
+   * Callers must follow this with `sim.reset()`: the per-agent arrays are sized
+   * to N and would otherwise be stale. Population is deliberately *not* mutated
+   * anywhere else, so that pairing is the only invariant to hold.
+   */
+  setPopulation(population) {
+    this.population = population;
+    const coeff = CONGESTION_AT_FULL / population;
+    for (const e of Object.values(this.edges)) {
+      if (e.congestible) e.coeff = coeff;
+    }
   }
 
   /** Indices into this.routes that agents are currently allowed to use. */

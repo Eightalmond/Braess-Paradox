@@ -2,13 +2,22 @@
  * render.js — canvas drawing.
  *
  * NetworkView draws the road network (edge width/colour keyed to congestion)
- * plus one animated dot per agent driving its route. Dots move slower on slower
- * routes, and an agent only adopts its newly chosen route once it finishes the
- * trip it is on — so the picture stays readable while the simulation churns.
+ * plus animated dots driving their routes. Dots move slower on slower routes,
+ * and an agent only adopts its newly chosen route once it finishes the trip it
+ * is on — so the picture stays readable while the simulation churns.
  *
  * ChartView draws average travel time per round with markers where the
  * shortcut was toggled. That chart is the punchline: adding a free road makes
  * the line jump *up*.
+ *
+ * Two V2 rules hold throughout this file:
+ *
+ *   - Nothing here reads wall time. `update(simDt)` is handed simulated seconds
+ *     by the Clock and is the only method that mutates animation state; a paused
+ *     clock delivers 0 and the dots therefore hold position exactly.
+ *   - `draw()` is pure output and idempotent. It may be called any number of
+ *     times while paused — which is what lets a resize or a theme change
+ *     repaint a frozen frame without advancing it.
  */
 
 // Violet for the shortcut and its route: the congestion scale already owns
@@ -18,6 +27,34 @@ const ROUTE_COLORS = ['#4a9eff', '#ffb454', SHORTCUT_COLOR];
 const ROUTE_OFFSETS = [-7, 7, 0]; // perpendicular dot offset so shared edges stay legible
 const NO_SHORTCUT_COLOR = '#3ddc97';
 const CHART_WINDOW = 800; // rounds visible in the sliding chart window
+// Above this population we draw a fixed-size sample of drivers rather than one
+// dot each: 1000 overlapping dots is neither legible nor cheap, and the sample
+// is spread evenly across agent indices so route proportions still read true.
+const MAX_DOTS = 400;
+
+// Theme variables are read once per theme rather than ~40 times per frame via
+// getComputedStyle. main.js calls invalidatePalette() when the theme changes.
+const THEME_VARS = [
+  '--text',
+  '--text-dim',
+  '--grid',
+  '--accent',
+  '--node-fill',
+  '--node-stroke',
+  '--edge-fixed',
+  '--edge-ghost',
+];
+let palette = null;
+
+function invalidatePalette() {
+  palette = null;
+}
+
+/** CSS-pixel size of a canvas, without touching its backing store. */
+function canvasSize(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return { w: Math.max(1, Math.round(rect.width)), h: Math.max(1, Math.round(rect.height)) };
+}
 
 function fitCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
@@ -34,7 +71,12 @@ function fitCanvas(canvas) {
 }
 
 function css(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (!palette) {
+    const computed = getComputedStyle(document.documentElement);
+    palette = {};
+    for (const v of THEME_VARS) palette[v] = computed.getPropertyValue(v).trim();
+  }
+  return palette[name];
 }
 
 class NetworkView {
@@ -45,16 +87,56 @@ class NetworkView {
     this.resetAgents();
   }
 
+  /**
+   * (Re)allocate dot state to match the current population. Must be called
+   * after anything that resizes or repopulates the simulation — `sim.reset()`
+   * or `graph.setPopulation()` — or the dots describe a population that no
+   * longer exists.
+   */
   resetAgents() {
     const N = this.graph.population;
-    this.travel = new Float32Array(N);
-    this.visualRoute = new Int8Array(N);
-    for (let i = 0; i < N; i++) {
+    const count = Math.min(N, MAX_DOTS);
+    this.dotAgent = new Int32Array(count); // which agent each dot stands for
+    this.travel = new Float32Array(count); // trip progress, 0..1
+    this.visualRoute = new Int8Array(count);
+    for (let j = 0; j < count; j++) {
+      this.dotAgent[j] = Math.floor((j * N) / count);
       // Random phase, not an even stagger: evenly spaced dots read as one solid
       // stripe, whereas random phases bunch and gap like real traffic.
-      this.travel[i] = Math.random();
-      this.visualRoute[i] = this.sim.agents[i];
+      this.travel[j] = Math.random();
+      this.visualRoute[j] = this.sim.agents[this.dotAgent[j]];
     }
+  }
+
+  /**
+   * Reconcile dots with a change in which routes exist.
+   *
+   * V1 let a dot keep driving a route that had just been deleted until it
+   * happened to finish its lap — up to a few seconds of traffic flowing down a
+   * road drawn as removed. The desync was invisible because the cost lookup
+   * fell back to a magic 65 for the inactive route. Snapping here preserves
+   * each dot's phase (so nothing teleports) while moving it onto a real road,
+   * and it works while paused, when `update()` is a deliberate no-op.
+   */
+  syncRoutes() {
+    for (let j = 0; j < this.travel.length; j++) {
+      if (this.graph.isRouteActive(this.visualRoute[j])) continue;
+      this.visualRoute[j] = this.sim.agents[this.dotAgent[j]];
+    }
+  }
+
+  /** Current pixel position of every dot — the render state, for assertions. */
+  dotPositions() {
+    const { w, h } = canvasSize(this.canvas);
+    const pos = this.nodePositions(w, h);
+    const geoms = this.graph.routes.map((_, i) => this.routeGeometry(i, pos));
+    const out = [];
+    for (let j = 0; j < this.travel.length; j++) {
+      const r = this.visualRoute[j];
+      const p = this.pointAlong(geoms[r], this.travel[j], ROUTE_OFFSETS[r]);
+      out.push({ x: p.x, y: p.y, route: r, travel: this.travel[j] });
+    }
+    return out;
   }
 
   nodePositions(w, h) {
@@ -98,19 +180,31 @@ class NetworkView {
     };
   }
 
-  /** Advance the dots. dt is in seconds. */
-  update(dt) {
+  /**
+   * Advance the dots by `simDt` *simulated* seconds, as issued by the Clock.
+   *
+   * This is the only place dot state changes, and it never consults wall time.
+   * A paused clock hands us 0 and we return immediately, so the dots hold their
+   * exact positions for as long as the pause lasts and continue from there.
+   */
+  update(simDt) {
+    if (!(simDt > 0)) return;
+
     const costs = this.sim.routeCosts();
-    for (let i = 0; i < this.travel.length; i++) {
-      const vr = this.visualRoute[i];
+    for (let j = 0; j < this.travel.length; j++) {
+      let vr = this.visualRoute[j];
+      // syncRoutes() normally handles this at the moment a road closes; the
+      // check keeps the invariant local so no cost lookup can ever be null.
+      if (!this.graph.isRouteActive(vr)) {
+        vr = this.visualRoute[j] = this.sim.agents[this.dotAgent[j]];
+      }
       // Slower route => slower dot. 25/cost gives roughly a third of a lap
       // per second at the equilibrium travel times.
-      const cost = costs[vr] || 65;
-      this.travel[i] += (dt * 25) / cost;
-      if (this.travel[i] >= 1) {
-        this.travel[i] -= Math.floor(this.travel[i]);
+      this.travel[j] += (simDt * 25) / costs[vr];
+      if (this.travel[j] >= 1) {
+        this.travel[j] -= Math.floor(this.travel[j]);
         // Trip finished — now honour whatever route this agent has since chosen.
-        this.visualRoute[i] = this.sim.agents[i];
+        this.visualRoute[j] = this.sim.agents[this.dotAgent[j]];
       }
     }
   }
@@ -186,9 +280,9 @@ class NetworkView {
 
     // --- agent dots ---
     const geoms = this.graph.routes.map((_, i) => this.routeGeometry(i, pos));
-    for (let i = 0; i < this.travel.length; i++) {
-      const r = this.visualRoute[i];
-      const p = this.pointAlong(geoms[r], this.travel[i], ROUTE_OFFSETS[r]);
+    for (let j = 0; j < this.travel.length; j++) {
+      const r = this.visualRoute[j];
+      const p = this.pointAlong(geoms[r], this.travel[j], ROUTE_OFFSETS[r]);
       ctx.fillStyle = ROUTE_COLORS[r];
       ctx.beginPath();
       ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
@@ -339,3 +433,4 @@ window.Braess = window.Braess || {};
 window.Braess.NetworkView = NetworkView;
 window.Braess.ChartView = ChartView;
 window.Braess.ROUTE_COLORS = ROUTE_COLORS;
+window.Braess.invalidatePalette = invalidatePalette;

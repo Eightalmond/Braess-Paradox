@@ -95,11 +95,13 @@ in roughly 25 rounds, and to the all-on-R3 state in a few hundred.
 
 | Control | What it does |
 | --- | --- |
-| **Play / Pause** | Runs best-response rounds continuously. Auto-pauses on reaching equilibrium. |
-| **Step** | Runs exactly one round — useful for watching convergence up close, or confirming that nothing moves once settled. |
+| **Play / Pause** | Runs best-response rounds continuously. Pause halts *everything* — rounds, chart, and the dots, which freeze mid-transit and continue from where they stopped. Auto-pauses on reaching equilibrium. |
+| **Step** | Runs exactly one round and the matching slice of dot motion — useful for watching convergence up close, or confirming that nothing moves once settled. |
 | **Reset** | Puts all drivers back on R1, clears history, removes the shortcut. |
 | **Add / Remove shortcut A→B** | Toggles the extra road. This is the paradox button. |
 | **Rounds/sec** | How fast rounds tick while playing. |
+| **Drivers** | Population size, 20–1000. Changing it restarts the run. The congestion coefficient is renormalized as `40/N`, so the 65 and 80 equilibria hold at every setting — N changes how granular the game is, not what it converges to. |
+| **Theme** | Auto (follow the OS), Light, or Dark. An explicit choice overrides the OS preference. |
 
 Suggested run-through:
 
@@ -120,7 +122,9 @@ Suggested run-through:
 - **Dots** are individual drivers, coloured by the route they're on (blue R1,
   amber R2, violet R3). A driver who picks a new route finishes their current
   trip before switching, so the dots lag the route table slightly — same as real
-  traffic. Dots move slower on slower routes.
+  traffic. Dots move slower on slower routes. Up to 400 drivers get a dot each;
+  above that a fixed 400-dot sample is drawn, spread evenly across the
+  population, while the route table keeps reporting true counts.
 - **The chart** plots average travel time per round, with dashed reference lines
   at 65 and 80 and a vertical marker wherever the shortcut was toggled. The jump
   *upward* right after a marker is the whole point.
@@ -131,8 +135,40 @@ Suggested run-through:
 | --- | --- |
 | `js/graph.js` | Network model: nodes, edges, cost functions, route enumeration. |
 | `js/simulation.js` | Driver population, best-response step, equilibrium detection, history log. |
+| `js/clock.js` | The single source of truth for "is the simulation running", and the only code that reads wall time. |
 | `js/render.js` | Canvas drawing — the network, the animated dots, the chart. |
-| `js/main.js` | Wires DOM controls to the simulation and drives the render loop. |
+| `js/main.js` | Wires DOM controls to the simulation and drives the frame loop. |
+| `tests/run.mjs` | Headless verification: control state, convergence claims, screenshots. |
+
+### One clock
+
+Everything that moves is driven by simulated time issued by `Clock`, never by
+wall time. `clock.tick()` returns the simulated seconds and whole rounds elapsed
+since the last frame — zero for both while paused — and the frame loop hands that
+same delta to the round loop and the dot animation alike. Nothing else in the app
+holds a `playing` flag or a timer of its own, which is why pause stops the whole
+picture at once instead of just the parts that happened to check.
+
+The frame loop keeps running while paused, with repainting split from advancement
+behind a dirty flag. That is what lets a window resize or a theme change repaint
+a frozen frame without advancing it by a single round.
+
+See [CHANGELOG.md](CHANGELOG.md) for the V1 pause bug this replaced, and the
+other control desyncs the audit turned up.
+
+## Tests
+
+```
+npm install
+npm test
+```
+
+17 headless Playwright checks driving the real page. Notably: pause is verified
+by reading actual dot coordinates, letting real animation frames elapse, and
+requiring bit-identical values; equilibrium convergence is re-verified at
+N = 40/200/1000 over 3000 rounds per phase, asserting zero switches and a flat
+cost band once settled; and screenshots are captured in both themes and checked
+for non-blankness. `node tests/run.mjs <substring>` runs a subset.
 
 ## Things worth trying
 

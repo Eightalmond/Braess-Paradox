@@ -1,0 +1,15 @@
+{
+  "name": "braess-paradox",
+  "version": "2.0.0",
+  "description": "Braess's Paradox traffic equilibrium simulator",
+  "scripts": {
+    "test": "node tests/run.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "playwright": "^1.62.0"
+  },
+  "private": true
+}

@@ -1,4 +1,15 @@
-:root {
+/*
+ * Theming. Dark is the base; light is applied either by the OS preference (when
+ * no override is set) or by an explicit `data-theme="light"` on <html>.
+ *
+ * The media query is scoped with :not([data-theme]) so that a user who picks
+ * Dark explicitly is not overridden by an OS set to light — the two rules
+ * cannot both apply, which keeps the picker authoritative in both directions
+ * regardless of source order.
+ */
+
+:root,
+:root[data-theme='dark'] {
   --bg: #10131a;
   --panel: #181c26;
   --panel-border: #262c3a;
@@ -13,8 +24,23 @@
   --badge-bg: #232a38;
 }
 
+:root[data-theme='light'] {
+  --bg: #f4f6fa;
+  --panel: #ffffff;
+  --panel-border: #dfe4ee;
+  --text: #1a2030;
+  --text-dim: #6b7488;
+  --accent: #2a72d8;
+  --grid: #d6dce8;
+  --node-fill: #eef1f7;
+  --node-stroke: #a9b3c6;
+  --edge-fixed: #a9b3c6;
+  --edge-ghost: #d3d9e5;
+  --badge-bg: #eef1f7;
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #f4f6fa;
     --panel: #ffffff;
     --panel-border: #dfe4ee;
@@ -144,22 +170,43 @@ button.shortcut.on {
   color: #fff;
 }
 
-.speed {
+.controls.sliders {
+  margin-top: 10px;
+  padding-top: 10px;
+  gap: 18px;
+}
+
+.slider {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-left: auto;
   font-size: 12px;
   color: var(--text-dim);
 }
 
-.speed input {
+.slider input[type='range'] {
   width: 92px;
 }
 
-#speed-value {
-  min-width: 18px;
+.theme-picker {
+  margin-left: auto;
+}
+
+select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--badge-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+#speed-value,
+#population-value {
+  min-width: 30px;
   font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 
 /* --- stats --- */
