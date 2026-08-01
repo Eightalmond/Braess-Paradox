@@ -24,7 +24,7 @@
  */
 
 (() => {
-  const { SCENARIOS, Graph, Simulation, Clock, NetworkView, ChartView, invalidatePalette, routeColor } =
+  const { SCENARIOS, Graph, Simulation, Clock, NetworkView, ChartView, invalidatePalette } =
     window.Braess;
 
   const el = {
@@ -42,7 +42,6 @@
     round: document.getElementById('round'),
     avgCost: document.getElementById('avg-cost'),
     badge: document.getElementById('eq-badge'),
-    badgeText: document.getElementById('eq-text'),
     routeRows: document.getElementById('route-rows'),
     edgeLegend: document.getElementById('edge-legend'),
     scenarioNotes: document.getElementById('scenario-notes'),
@@ -135,29 +134,10 @@
     rows = graph.routes.map((route) => {
       const tr = document.createElement('tr');
       tr.innerHTML =
-        `<td><span class="swatch"></span>${route.name}</td>` +
+        `<td><span class="swatch" style="background:${route.color}"></span>${route.name}</td>` +
         `<td class="num" data-count></td><td class="num" data-cost></td>`;
       el.routeRows.appendChild(tr);
-      return {
-        tr,
-        swatch: tr.querySelector('.swatch'),
-        count: tr.querySelector('[data-count]'),
-        cost: tr.querySelector('[data-cost]'),
-      };
-    });
-    paintSwatches();
-  }
-
-  /**
-   * Series colours are per-theme, so the swatches are painted from the resolved
-   * palette rather than baked into the row markup — otherwise a theme change
-   * would leave the table showing the other theme's colours.
-   */
-  function paintSwatches() {
-    rows.forEach((row, i) => {
-      const color = routeColor(graph, i);
-      row.swatch.style.background = color;
-      row.swatch.style.color = color; // the swatch glow is currentColor
+      return { tr, count: tr.querySelector('[data-count]'), cost: tr.querySelector('[data-cost]') };
     });
   }
 
@@ -175,8 +155,8 @@
 
     const settled = sim.atEquilibrium();
     el.badge.classList.toggle('settled', settled);
-    el.badgeText.textContent = settled
-      ? 'Equilibrium — nobody wants to switch'
+    el.badge.textContent = settled
+      ? '✓ Equilibrium — nobody wants to switch'
       : 'searching for equilibrium…';
 
     // Auto-pause the moment the system settles: it parks the chart on the
@@ -276,14 +256,12 @@
     // The canvases paint with CSS variables they cache, and a paused canvas
     // gets no automatic repaint. Drop the cache and ask for one.
     invalidatePalette();
-    paintSwatches();
     requestDraw();
   }
 
   // A theme flip while paused must still repaint, in auto mode too.
   window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
     invalidatePalette();
-    paintSwatches();
     requestDraw();
   });
 

@@ -79,16 +79,6 @@ const frames = (page, n = 10) =>
 
 const snapshot = (page) => page.evaluate(() => window.Braess.app.snapshot());
 
-/** The theme the stylesheet has actually resolved — the canvas reads the same var. */
-const resolvedScheme = (page) =>
-  page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--scheme').trim());
-
-/** '#rrggbb' → the 'rgb(r, g, b)' form the DOM reports back from style.background. */
-const hexToRgb = (hex) => {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-};
-
 /**
  * Largest pixel displacement of any dot between two snapshots. Correct for
  * "did anything move at all" (0 means frozen), but not for measuring *how far*
@@ -435,79 +425,28 @@ async function main() {
     // Context is dark; ask for light explicitly and the picker must win.
     await page.selectOption('#theme', 'light');
     await frames(page, 3);
-    // `--scheme` is what the canvas reads to pick its palette, so assert the
-    // resolved scheme rather than a background colour that is only a symptom.
-    assert((await resolvedScheme(page)) === 'light', 'explicit light did not resolve to light');
+    let bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    assert(bg === 'rgb(244, 246, 250)', `explicit light gave ${bg}`);
 
     await page.selectOption('#theme', 'dark');
     await frames(page, 3);
-    assert((await resolvedScheme(page)) === 'dark', 'explicit dark did not resolve to dark');
+    bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    assert(bg === 'rgb(16, 19, 26)', `explicit dark gave ${bg}`);
 
     await page.selectOption('#theme', 'auto');
     await frames(page, 3);
-    assert((await resolvedScheme(page)) === 'dark', 'auto under a dark OS did not resolve to dark');
+    bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    assert(bg === 'rgb(16, 19, 26)', `auto under a dark OS gave ${bg}`);
   });
 
   await test('theme picker honours a light OS preference in auto mode', async (page) => {
-    assert((await resolvedScheme(page)) === 'light', 'auto under a light OS did not resolve to light');
+    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    assert(bg === 'rgb(244, 246, 250)', `auto under a light OS gave ${bg}`);
     await page.selectOption('#theme', 'dark');
     await frames(page, 3);
-    assert((await resolvedScheme(page)) === 'dark', 'explicit dark under a light OS lost to the OS');
+    const dark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    assert(dark === 'rgb(16, 19, 26)', `explicit dark under a light OS gave ${dark}`);
   }, { colorScheme: 'light' });
-
-  await test('series colours are theme-specific in the canvas and the table', async (page) => {
-    // V3 used one palette for both themes, so the double network's pale tints were
-    // near-invisible on a light surface. Route colours are now per-theme, which
-    // means two things have to move together on a theme change: what the canvas
-    // draws with, and what the route table's swatches show.
-    const read = () =>
-      page.evaluate(() => ({
-        scheme: getComputedStyle(document.documentElement).getPropertyValue('--scheme').trim(),
-        routes: window.Braess.app.graph.routes.map((_, i) =>
-          window.Braess.routeColor(window.Braess.app.graph, i)
-        ),
-        swatches: Array.from(document.querySelectorAll('#route-rows .swatch')).map(
-          (s) => s.style.background
-        ),
-      }));
-
-    await page.selectOption('#theme', 'dark');
-    await frames(page, 3);
-    const dark = await read();
-    await page.selectOption('#theme', 'light');
-    await frames(page, 3);
-    const light = await read();
-
-    assert(dark.scheme === 'dark' && light.scheme === 'light', 'scheme did not switch');
-    assert(
-      dark.routes.every((c, i) => c !== light.routes[i]),
-      `route colours did not change with the theme: ${dark.routes} vs ${light.routes}`
-    );
-    for (const set of [dark, light]) {
-      assert(new Set(set.routes).size === set.routes.length, `duplicate route colours: ${set.routes}`);
-      // A swatch showing the other theme's colour is the desync this guards.
-      assert(
-        set.swatches.length === set.routes.length,
-        `${set.swatches.length} swatches for ${set.routes.length} routes`
-      );
-      set.swatches.forEach((sw, i) => {
-        const want = set.routes[i].toLowerCase();
-        const rgb = hexToRgb(want);
-        assert(
-          sw.replace(/\s/g, '') === rgb.replace(/\s/g, ''),
-          `swatch ${i} is ${sw}, want ${rgb} (${want}) in ${set.scheme}`
-        );
-      });
-    }
-
-    // And the canvas must actually repaint with them, not just the model change.
-    await page.selectOption('#theme', 'dark');
-    await frames(page, 4);
-    const darkShot = await page.locator('#network').screenshot();
-    await page.selectOption('#theme', 'light');
-    await frames(page, 4);
-    assert(!darkShot.equals(await page.locator('#network').screenshot()), 'canvas did not repaint');
-  });
 
   await test('auto-pause on equilibrium stops the dots too', async (page) => {
     await page.click('#play');
@@ -521,51 +460,6 @@ async function main() {
     const later = await snapshot(page);
     assert(maxDotShift(settled, later) === 0, 'dots kept moving after auto-pause');
     assert((await page.textContent('#eq-badge')).includes('Equilibrium'), 'badge did not settle');
-  });
-
-  await test('chart canvas height is deterministic, not a layout feedback loop', async (page) => {
-    // The chart canvas grows to balance the two columns. Its backing store is
-    // derived from its rendered height, so if CSS ever sized it from `height:
-    // auto` the layout and the backing store would define each other and the
-    // canvas would settle on whatever the first pass produced. Assert a stable,
-    // in-range height across many frames instead.
-    const measure = () =>
-      page.evaluate(() => {
-        const c = document.getElementById('chart');
-        return {
-          chart: Math.round(c.getBoundingClientRect().height),
-          left: Math.round(document.querySelector('.col-main').getBoundingClientRect().height),
-          right: Math.round(document.querySelector('.stats-panel').getBoundingClientRect().height),
-        };
-      });
-
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await frames(page, 3);
-    const first = await measure();
-    await page.click('#play');
-    await page.waitForTimeout(1500);
-    await frames(page, 30);
-    const later = await measure();
-
-    assert(later.chart === first.chart, `chart drifted from ${first.chart}px to ${later.chart}px`);
-    assert(first.chart >= 220, `chart is ${first.chart}px, under its 220px floor`);
-    // The canvas fills its panel exactly — leftover space inside the panel would
-    // mean the cap and the flex growth disagree.
-    const slack = await page.evaluate(() => {
-      const panel = document.querySelector('.chart-panel').getBoundingClientRect();
-      const c = document.getElementById('chart').getBoundingClientRect();
-      return Math.round(panel.bottom - c.bottom);
-    });
-    assert(slack >= 12 && slack <= 20, `${slack}px between the chart canvas and its panel edge`);
-    // The layout exists to stop a void opening under the network panel: the left
-    // column must never end short of the stats column.
-    assert(first.left >= first.right - 1, `left column ${first.left}px, stats column ${first.right}px`);
-
-    await page.evaluate(() => window.Braess.app.selectScenarioById('double'));
-    await frames(page, 5);
-    const dbl = await measure();
-    assert(dbl.chart >= first.chart, 'chart did not grow to balance the taller double-network column');
-    assert(dbl.left >= dbl.right - 1, `double: left ${dbl.left}px vs stats ${dbl.right}px`);
   });
 
   // --- 3. the equilibrium claims, re-verified against the refactored sim ---

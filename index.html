@@ -17,8 +17,7 @@
     <nav class="tabs" id="tabs" role="tablist"></nav>
 
     <main>
-      <div class="col-main">
-        <section class="panel network-panel">
+      <section class="panel network-panel">
         <p class="tagline" id="tagline"></p>
         <canvas id="network"></canvas>
         <div class="controls">
@@ -46,14 +45,8 @@
               <option value="dark">Dark</option>
             </select>
           </label>
-          </div>
-        </section>
-
-        <section class="panel chart-panel">
-          <h2>Average travel time per round</h2>
-          <canvas id="chart"></canvas>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <aside class="panel stats-panel">
         <div class="stat-row">
@@ -67,7 +60,7 @@
           </div>
         </div>
 
-        <div id="eq-badge" class="badge" role="status"><span id="eq-text">searching…</span></div>
+        <div id="eq-badge" class="badge">searching…</div>
 
         <table class="routes">
           <thead>
@@ -92,6 +85,11 @@
           <ol id="scenario-notes"></ol>
         </div>
       </aside>
+
+      <section class="panel chart-panel">
+        <h2>Average travel time per round</h2>
+        <canvas id="chart"></canvas>
+      </section>
     </main>
 
     <script src="js/scenarios.js"></script>

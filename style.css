@@ -6,100 +6,53 @@
  * Dark explicitly is not overridden by an OS set to light — the two rules
  * cannot both apply, which keeps the picker authoritative in both directions
  * regardless of source order.
- *
- * `--scheme` is the machine-readable name of the resolved theme. The canvas code
- * reads it to pick the matching series palette, which makes CSS the single
- * authority on which theme is live — there is no second copy of that decision in
- * JS to fall out of step.
  */
 
 :root,
 :root[data-theme='dark'] {
-  --scheme: dark;
-  --bg: #070a12;
-  --bg-glow-1: rgba(59, 130, 246, 0.16);
-  --bg-glow-2: rgba(236, 72, 153, 0.12);
-  --panel: rgba(17, 22, 37, 0.72);
-  --panel-solid: #0b1020;
-  --panel-border: rgba(148, 172, 255, 0.14);
-  --panel-hairline: rgba(148, 172, 255, 0.09);
-  --text: #eaf0ff;
-  --text-dim: #8b9ac0;
-  --text-faint: #5d6a8c;
+  --bg: #10131a;
+  --panel: #181c26;
+  --panel-border: #262c3a;
+  --text: #e8ecf4;
+  --text-dim: #8b95ab;
   --accent: #4a9eff;
-  --accent-2: #22d3ee;
-  --accent-ink: #061018;
-  --grid: rgba(148, 172, 255, 0.13);
-  --node-fill: #141b2e;
-  --node-fill-2: #1e2740;
-  --node-stroke: rgba(148, 172, 255, 0.42);
-  --edge-fixed: #4a5878;
-  --edge-ghost: rgba(148, 172, 255, 0.16);
-  --chip-bg: rgba(7, 10, 18, 0.78);
-  --badge-bg: rgba(148, 172, 255, 0.09);
-  --control-bg: rgba(148, 172, 255, 0.07);
-  --track: rgba(148, 172, 255, 0.16);
-  --good: #34d399;
-  --shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.85);
+  --grid: #2d3548;
+  --node-fill: #222836;
+  --node-stroke: #4a5468;
+  --edge-fixed: #4a5468;
+  --edge-ghost: #333b4d;
+  --badge-bg: #232a38;
 }
 
 :root[data-theme='light'] {
-  --scheme: light;
-  --bg: #eef2fa;
-  --bg-glow-1: rgba(37, 99, 235, 0.09);
-  --bg-glow-2: rgba(219, 39, 119, 0.07);
-  --panel: rgba(255, 255, 255, 0.78);
-  --panel-solid: #ffffff;
-  --panel-border: rgba(30, 50, 100, 0.13);
-  --panel-hairline: rgba(30, 50, 100, 0.08);
-  --text: #101a2e;
-  --text-dim: #5b6884;
-  --text-faint: #8c98b2;
-  --accent: #2563eb;
-  --accent-2: #0e7490;
-  --accent-ink: #ffffff;
-  --grid: rgba(30, 50, 100, 0.13);
-  --node-fill: #ffffff;
-  --node-fill-2: #e6ecf8;
-  --node-stroke: rgba(30, 50, 100, 0.3);
-  --edge-fixed: #9aa7c2;
-  --edge-ghost: rgba(30, 50, 100, 0.16);
-  --chip-bg: rgba(255, 255, 255, 0.9);
-  --badge-bg: rgba(30, 50, 100, 0.06);
-  --control-bg: rgba(30, 50, 100, 0.05);
-  --track: rgba(30, 50, 100, 0.14);
-  --good: #047857;
-  --shadow: 0 18px 40px -24px rgba(20, 35, 70, 0.4);
+  --bg: #f4f6fa;
+  --panel: #ffffff;
+  --panel-border: #dfe4ee;
+  --text: #1a2030;
+  --text-dim: #6b7488;
+  --accent: #2a72d8;
+  --grid: #d6dce8;
+  --node-fill: #eef1f7;
+  --node-stroke: #a9b3c6;
+  --edge-fixed: #a9b3c6;
+  --edge-ghost: #d3d9e5;
+  --badge-bg: #eef1f7;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --scheme: light;
-    --bg: #eef2fa;
-    --bg-glow-1: rgba(37, 99, 235, 0.09);
-    --bg-glow-2: rgba(219, 39, 119, 0.07);
-    --panel: rgba(255, 255, 255, 0.78);
-    --panel-solid: #ffffff;
-    --panel-border: rgba(30, 50, 100, 0.13);
-    --panel-hairline: rgba(30, 50, 100, 0.08);
-    --text: #101a2e;
-    --text-dim: #5b6884;
-    --text-faint: #8c98b2;
-    --accent: #2563eb;
-    --accent-2: #0e7490;
-    --accent-ink: #ffffff;
-    --grid: rgba(30, 50, 100, 0.13);
-    --node-fill: #ffffff;
-    --node-fill-2: #e6ecf8;
-    --node-stroke: rgba(30, 50, 100, 0.3);
-    --edge-fixed: #9aa7c2;
-    --edge-ghost: rgba(30, 50, 100, 0.16);
-    --chip-bg: rgba(255, 255, 255, 0.9);
-    --badge-bg: rgba(30, 50, 100, 0.06);
-    --control-bg: rgba(30, 50, 100, 0.05);
-    --track: rgba(30, 50, 100, 0.14);
-    --good: #047857;
-    --shadow: 0 18px 40px -24px rgba(20, 35, 70, 0.4);
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --panel-border: #dfe4ee;
+    --text: #1a2030;
+    --text-dim: #6b7488;
+    --accent: #2a72d8;
+    --grid: #d6dce8;
+    --node-fill: #eef1f7;
+    --node-stroke: #a9b3c6;
+    --edge-fixed: #a9b3c6;
+    --edge-ghost: #d3d9e5;
+    --badge-bg: #eef1f7;
   }
 }
 
@@ -109,209 +62,105 @@
 
 body {
   margin: 0;
-  padding: 26px 24px 40px;
-  min-height: 100vh;
+  padding: 24px;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-
-/* Two soft light sources behind everything, so the glass panels have something
-   to refract. Fixed and non-interactive: it never moves, so it cannot imply
-   motion while the simulation is paused. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  background:
-    radial-gradient(58vw 48vh at 14% -6%, var(--bg-glow-1), transparent 62%),
-    radial-gradient(52vw 46vh at 92% 8%, var(--bg-glow-2), transparent 60%);
-}
-
-.wrap {
-  max-width: 1220px;
-  margin: 0 auto;
-}
-
-/* --- header --- */
 
 header {
-  max-width: 1220px;
-  margin: 0 auto 20px;
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  flex-wrap: wrap;
+  max-width: 1180px;
+  margin: 0 auto 18px;
 }
 
 h1 {
   margin: 0;
-  font-size: 25px;
-  font-weight: 700;
-  letter-spacing: -0.022em;
-  background: linear-gradient(96deg, var(--text) 18%, var(--accent) 78%, var(--accent-2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-size: 24px;
+  letter-spacing: -0.01em;
 }
 
 .sub {
-  margin: 0;
+  margin: 4px 0 0;
   color: var(--text-dim);
-  font-size: 13px;
 }
 
-/* --- tabs: a segmented control, not browser chrome --- */
-
 .tabs {
-  max-width: 1220px;
-  margin: 0 auto 16px;
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  background: var(--panel);
-  backdrop-filter: blur(14px);
-  box-shadow: var(--shadow);
+  max-width: 1180px;
+  margin: 0 auto 14px;
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .tab {
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
   background: none;
   color: var(--text-dim);
-  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  padding: 7px 16px;
-  transition: color 0.16s, background 0.16s, box-shadow 0.16s;
+  padding: 8px 14px;
+  margin-bottom: -1px;
 }
 
 .tab:hover {
   color: var(--text);
-  background: var(--control-bg);
   border-color: transparent;
 }
 
 .tab.active {
-  color: var(--text);
-  background: linear-gradient(180deg, var(--control-bg), transparent);
-  border-color: var(--panel-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 0 1px rgba(74, 158, 255, 0.12);
-}
-
-.tab.active::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 8px;
-  border-radius: 50%;
-  vertical-align: 1px;
-  background: var(--accent);
-  box-shadow: 0 0 9px var(--accent);
-}
-
-/* --- layout --- */
-
-/*
- * Two independent columns: network + chart stacked on the left, stats on the
- * right. Flex rather than grid on purpose — a grid item spanning both rows
- * redistributes its extra height into those rows, which pushed the chart down
- * and reopened the very gap this layout exists to close. Flex columns size
- * themselves and simply end at different heights.
- */
-main {
-  max-width: 1220px;
-  margin: 0 auto;
-  display: flex;
-  align-items: stretch;
-  gap: 16px;
-}
-
-/* Stretched to whichever column is taller, with the chart taking up the slack —
-   so the two columns end level however long the scenario's notes run. */
-.col-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.chart-panel {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.stats-panel {
-  flex: 0 0 336px;
-  align-self: flex-start;
-}
-
-.panel {
-  position: relative;
   background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 16px;
-  backdrop-filter: blur(16px);
-  box-shadow: var(--shadow);
-}
-
-/* A hairline of light along the top edge — the thing that reads as "glass". */
-.panel::after {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  border-radius: 16px 16px 0 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
-  pointer-events: none;
-}
-
-.panel h2 {
-  margin: 0 0 10px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.11em;
-  color: var(--text-faint);
+  border-color: var(--panel-border);
+  border-bottom-color: var(--panel);
+  color: var(--text);
 }
 
 .tagline {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  /* Let each panel hug its content instead of stretching the network panel to
+     match the taller notes column, which left a big empty gap under the road. */
+  align-items: start;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.chart-panel {
+  grid-column: 1 / -1;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-dim);
 }
 
 #network {
   display: block;
   width: 100%;
-  height: 420px;
+  height: 400px;
 }
 
-/*
- * `height: 0` matters. A canvas with width/height *attributes* has an intrinsic
- * aspect ratio, so `height: auto` would size it from the backing store that
- * fitCanvas derives from its rendered height — the layout and the backing store
- * would each be defined in terms of the other. It happens to converge, but on
- * whatever the first layout pass produced rather than on anything chosen. Basing
- * it at 0 and letting flex grow it keeps the height deterministic.
- */
 #chart {
   display: block;
   width: 100%;
-  flex: 1 1 auto;
-  height: 0;
-  min-height: 220px;
+  height: 210px;
 }
 
 /* --- controls --- */
@@ -321,124 +170,65 @@ main {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--panel-hairline);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-border);
 }
 
 button {
   font: inherit;
-  font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  background: var(--control-bg);
+  background: var(--badge-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 8px 14px;
+  border-radius: 8px;
+  padding: 7px 13px;
   cursor: pointer;
-  transition: border-color 0.16s, box-shadow 0.16s, transform 0.08s, background 0.16s;
 }
 
 button:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.12);
-}
-
-button:active {
-  transform: translateY(1px);
-}
-
-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 button.primary {
-  min-width: 104px;
-  color: var(--accent-ink);
-  background: linear-gradient(135deg, var(--accent-2), var(--accent));
-  border-color: transparent;
-  box-shadow: 0 6px 18px -8px var(--accent);
-}
-
-button.primary:hover {
-  box-shadow: 0 8px 22px -8px var(--accent), 0 0 0 3px rgba(74, 158, 255, 0.16);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .shortcut-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-left: auto;
 }
 
 button.shortcut {
-  border-color: rgba(236, 72, 153, 0.42);
-  color: #ec4b9b;
-}
-
-button.shortcut:hover {
-  border-color: #ec4b9b;
-  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.14);
+  border-color: #c07cff;
+  color: #c07cff;
 }
 
 button.shortcut.on {
+  background: #ff5d8f;
+  border-color: #ff5d8f;
   color: #fff;
-  background: linear-gradient(135deg, #b93978, #ec4b9b);
-  border-color: transparent;
-  box-shadow: 0 6px 18px -8px #ec4b9b;
 }
 
-/* --- sliders --- */
-
 .controls.sliders {
-  gap: 20px;
+  margin-top: 10px;
+  padding-top: 10px;
+  gap: 18px;
 }
 
 .slider {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
-input[type='range'] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 104px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--track);
-  cursor: pointer;
-}
-
-input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--panel-solid);
-  background: var(--accent);
-  box-shadow: 0 0 10px -1px var(--accent);
-}
-
-input[type='range']::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--panel-solid);
-  background: var(--accent);
-  box-shadow: 0 0 10px -1px var(--accent);
-}
-
-input[type='range']:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+.slider input[type='range'] {
+  width: 92px;
 }
 
 .theme-picker {
@@ -448,120 +238,63 @@ input[type='range']:focus-visible {
 select {
   font: inherit;
   font-size: 12px;
-  font-weight: 600;
   color: var(--text);
-  background: var(--control-bg);
+  background: var(--badge-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 5px 8px;
-  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px 6px;
 }
 
 #speed-value,
 #population-value {
-  min-width: 34px;
-  font: 600 12.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-width: 30px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
   color: var(--text);
 }
 
 /* --- stats --- */
 
 .stat-row {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px;
+  display: flex;
+  gap: 18px;
 }
 
 .stat {
-  padding: 10px 12px;
-  border: 1px solid var(--panel-hairline);
-  border-radius: 12px;
-  background: var(--control-bg);
+  display: flex;
+  flex-direction: column;
 }
 
 .stat-label {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-faint);
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
 }
 
 .stat-value {
-  display: block;
-  margin-top: 2px;
-  font: 600 20px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 600 18px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
 }
 
 .stat-value.big {
-  font-size: 30px;
-  background: linear-gradient(180deg, var(--text), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-size: 26px;
 }
 
 .badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
   margin: 12px 0;
-  padding: 8px 12px;
-  border: 1px solid var(--panel-hairline);
+  padding: 6px 10px;
   border-radius: 999px;
   background: var(--badge-bg);
   color: var(--text-dim);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-/* A status dot, so "settled" is not signalled by colour alone. */
-.badge::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--text-faint);
-  animation: searching 1.6s ease-in-out infinite;
+  text-align: center;
 }
 
 .badge.settled {
-  border-color: rgba(52, 211, 153, 0.34);
-  background: rgba(52, 211, 153, 0.12);
-  color: var(--good);
+  background: rgba(61, 220, 151, 0.16);
+  color: #3ddc97;
 }
-
-.badge.settled::before {
-  background: var(--good);
-  box-shadow: 0 0 9px var(--good);
-  animation: none;
-}
-
-@keyframes searching {
-  0%,
-  100% {
-    opacity: 0.28;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .badge::before {
-    animation: none;
-  }
-}
-
-/* --- route table --- */
 
 table.routes {
   width: 100%;
@@ -571,30 +304,22 @@ table.routes {
 
 table.routes th,
 table.routes td {
-  padding: 7px 4px;
+  padding: 6px 4px;
   text-align: left;
-  border-bottom: 1px solid var(--panel-hairline);
+  border-bottom: 1px solid var(--panel-border);
 }
 
 table.routes th {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--text-faint);
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  font-weight: 600;
 }
 
 table.routes td {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12.5px;
-}
-
-table.routes tbody tr {
-  transition: background 0.14s;
-}
-
-table.routes tbody tr:hover {
-  background: var(--control-bg);
+  font-size: 13px;
 }
 
 .num {
@@ -602,67 +327,43 @@ table.routes tbody tr:hover {
 }
 
 tr.inactive {
-  opacity: 0.34;
+  opacity: 0.38;
 }
 
-/* The swatch is the only place a series colour appears next to text — the text
-   itself stays in ink, so identity is never carried by colour alone. */
 .swatch {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 8px;
-  box-shadow: 0 0 7px -1px currentColor;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 7px;
 }
 
 .notes {
-  margin-top: 18px;
+  margin-top: 16px;
   font-size: 12.5px;
   color: var(--text-dim);
 }
 
 .notes ul,
 .notes ol {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   padding-left: 18px;
 }
 
 .notes li {
-  margin-bottom: 4px;
-}
-
-.notes li::marker {
-  color: var(--text-faint);
+  margin-bottom: 3px;
 }
 
 .notes strong {
   color: var(--text);
 }
 
-.notes em {
-  color: var(--text-faint);
-  font-style: normal;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
 .notes code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   main {
-    flex-direction: column;
-  }
-
-  .stats-panel {
-    flex: 1 1 auto;
-    align-self: stretch;
-  }
-
-  #network {
-    height: 340px;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
