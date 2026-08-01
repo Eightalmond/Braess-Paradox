@@ -14,17 +14,26 @@
  * Step 3 is deliberately separate from steps 1–2: the loop keeps running while
  * paused so that a resize or a theme change can repaint a frozen frame without
  * advancing it. "Frozen" is a property of the clock, never of the loop.
+ *
+ * V3 adds scenarios. Everything that varies between networks — nodes, edges,
+ * routes, the free roads and their buttons, the chart's reference lines, the
+ * legend and the walkthrough — is rebuilt from scenario data by `rebuild()`.
+ * Switching network, changing N and pressing Reset all funnel through the same
+ * synchronous `restart()`, because a half-swapped network is precisely the class
+ * of desync this project already had to fix once.
  */
 
 (() => {
-  const { Graph, Simulation, Clock, NetworkView, ChartView, ROUTE_COLORS, invalidatePalette } =
+  const { SCENARIOS, Graph, Simulation, Clock, NetworkView, ChartView, invalidatePalette } =
     window.Braess;
 
   const el = {
+    tabs: document.getElementById('tabs'),
+    tagline: document.getElementById('tagline'),
     play: document.getElementById('play'),
     step: document.getElementById('step'),
     reset: document.getElementById('reset'),
-    shortcut: document.getElementById('shortcut'),
+    shortcutButtons: document.getElementById('shortcut-buttons'),
     speed: document.getElementById('speed'),
     speedValue: document.getElementById('speed-value'),
     population: document.getElementById('population'),
@@ -35,11 +44,12 @@
     badge: document.getElementById('eq-badge'),
     routeRows: document.getElementById('route-rows'),
     edgeLegend: document.getElementById('edge-legend'),
+    scenarioNotes: document.getElementById('scenario-notes'),
   };
 
   // Every initial value is read from the DOM rather than duplicated here, so the
   // markup and the JS cannot disagree about what the controls start at.
-  const graph = new Graph(Number(el.population.value));
+  const graph = new Graph(SCENARIOS[0], Number(el.population.value));
   const sim = new Simulation(graph);
   const clock = new Clock({ speed: Number(el.speed.value) });
   const networkView = new NetworkView(document.getElementById('network'), graph, sim);
@@ -47,33 +57,89 @@
 
   let wasSettled = false;
   let needsDraw = true;
+  let rows = []; // one per route, rebuilt when the scenario changes
+  let roadButtons = []; // one per toggleable edge, likewise
 
   /** Ask for one repaint on the next frame. Safe to call while paused. */
   function requestDraw() {
     needsDraw = true;
   }
 
-  // --- static legend of the cost functions (rebuilt when N changes) ---
-  function buildEdgeLegend() {
+  // --- scenario tabs ---
+  const tabs = SCENARIOS.map((scenario) => {
+    const button = document.createElement('button');
+    button.className = 'tab';
+    button.textContent = scenario.name;
+    button.setAttribute('role', 'tab');
+    button.addEventListener('click', () => selectScenario(scenario));
+    el.tabs.appendChild(button);
+    return { scenario, button };
+  });
+
+  function selectScenario(scenario) {
+    if (graph.scenario === scenario) return;
+    // Pause before touching the topology: a frame landing mid-swap would render
+    // the new network against the old population's route indices.
+    setRunning(false);
+    graph.load(scenario);
+    rebuild();
+    restart();
+  }
+
+  /**
+   * Rebuild every piece of UI that is scenario-shaped. Idempotent, and safe to
+   * call for the initial network as well as for a switch.
+   */
+  function rebuild() {
+    const scenario = graph.scenario;
+
+    for (const t of tabs) {
+      const on = t.scenario === scenario;
+      t.button.classList.toggle('active', on);
+      t.button.setAttribute('aria-selected', String(on));
+    }
+    el.tagline.textContent = scenario.tagline;
+
+    // --- one build/demolish button per free road ---
+    el.shortcutButtons.innerHTML = '';
+    roadButtons = graph.toggleableEdges().map(({ key, label }) => {
+      const button = document.createElement('button');
+      button.className = 'shortcut';
+      button.dataset.edge = key;
+      button.addEventListener('click', () => toggleRoad(key));
+      el.shortcutButtons.appendChild(button);
+      return { key, label, button };
+    });
+
+    // --- cost-function legend ---
     el.edgeLegend.innerHTML = '';
     for (const [key, e] of Object.entries(graph.edges)) {
       const li = document.createElement('li');
-      const label = `${e.from}→${e.to}`;
-      const kind = e.congestible ? 'congestible' : e.shortcut ? 'shortcut' : 'fixed';
-      li.innerHTML = `<strong>${label}</strong> = ${graph.edgeFormula(key)} <em>(${kind})</em>`;
+      const kind = e.congestible ? 'congestible' : e.toggleable ? 'free road' : 'fixed';
+      li.innerHTML =
+        `<strong>${e.from}→${e.to}</strong> = ${graph.edgeFormula(key)} <em>(${kind})</em>`;
       el.edgeLegend.appendChild(li);
     }
-  }
 
-  // --- route table skeleton, built once ---
-  const rows = graph.routes.map((route, i) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-      `<td><span class="swatch" style="background:${ROUTE_COLORS[i]}"></span>${route.name}</td>` +
-      `<td class="num" data-count></td><td class="num" data-cost></td>`;
-    el.routeRows.appendChild(tr);
-    return { tr, count: tr.querySelector('[data-count]'), cost: tr.querySelector('[data-cost]') };
-  });
+    // --- walkthrough ---
+    el.scenarioNotes.innerHTML = '';
+    for (const note of scenario.notes) {
+      const li = document.createElement('li');
+      li.innerHTML = note;
+      el.scenarioNotes.appendChild(li);
+    }
+
+    // --- route table ---
+    el.routeRows.innerHTML = '';
+    rows = graph.routes.map((route) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td><span class="swatch" style="background:${route.color}"></span>${route.name}</td>` +
+        `<td class="num" data-count></td><td class="num" data-cost></td>`;
+      el.routeRows.appendChild(tr);
+      return { tr, count: tr.querySelector('[data-count]'), cost: tr.querySelector('[data-cost]') };
+    });
+  }
 
   function updateStats() {
     const costs = sim.routeCosts();
@@ -102,12 +168,14 @@
   }
 
   function syncControls() {
-    // The button label is derived from the clock, never tracked alongside it.
+    // Every label is derived from the model, never tracked alongside it.
     el.play.textContent = clock.running ? '❚❚ Pause' : '▶ Play';
     el.play.setAttribute('aria-pressed', String(clock.running));
-    const on = graph.shortcutEnabled;
-    el.shortcut.classList.toggle('on', on);
-    el.shortcut.textContent = on ? '−  Remove shortcut A→B' : '＋ Add shortcut A→B';
+    for (const road of roadButtons) {
+      const on = graph.enabled.has(road.key);
+      road.button.classList.toggle('on', on);
+      road.button.textContent = on ? `−  Remove ${road.label}` : `＋ Add ${road.label}`;
+    }
     el.speedValue.textContent = clock.speed;
     el.populationValue.textContent = graph.population;
   }
@@ -120,16 +188,27 @@
   }
 
   /**
-   * Full teardown to a cold start, used by Reset and by any change of N.
-   * The clock, the simulation and the dot arrays are rebuilt together in one
-   * synchronous block — there is no frame in between for them to disagree in.
+   * Full teardown to a cold start, used by Reset, by any change of N, and by a
+   * scenario switch. The clock, the simulation and the dot arrays are rebuilt
+   * together in one synchronous block — there is no frame in between for them to
+   * disagree in.
    */
   function restart() {
     clock.reset();
     sim.reset();
     networkView.resetAgents();
     wasSettled = false;
-    buildEdgeLegend();
+    syncControls();
+    updateStats();
+    requestDraw();
+  }
+
+  function toggleRoad(key) {
+    sim.toggleEdge(key);
+    // Dots on a road that no longer exists snap to their fallback route now,
+    // keeping their phase. Required while paused, where update() is a no-op.
+    networkView.syncRoutes();
+    wasSettled = false; // the equilibrium question is open again
     syncControls();
     updateStats();
     requestDraw();
@@ -150,17 +229,6 @@
 
   el.reset.addEventListener('click', restart);
 
-  el.shortcut.addEventListener('click', () => {
-    sim.toggleShortcut();
-    // Dots on a road that no longer exists snap to their fallback route now,
-    // keeping their phase. Required while paused, where update() is a no-op.
-    networkView.syncRoutes();
-    wasSettled = false; // the equilibrium question is open again
-    syncControls();
-    updateStats();
-    requestDraw();
-  });
-
   el.speed.addEventListener('input', () => {
     clock.speed = Number(el.speed.value);
     syncControls();
@@ -173,12 +241,11 @@
     // graph.setPopulation() and sim.reset() on the arrays it invalidated.
     setRunning(false);
     graph.setPopulation(Number(el.population.value));
+    rebuild(); // the legend quotes N in the congestible cost functions
     restart();
   });
 
-  el.theme.addEventListener('change', () => {
-    applyTheme(el.theme.value);
-  });
+  el.theme.addEventListener('change', () => applyTheme(el.theme.value));
 
   function applyTheme(value) {
     // 'auto' means "no override" — remove the attribute and let the
@@ -193,8 +260,7 @@
   }
 
   // A theme flip while paused must still repaint, in auto mode too.
-  const schemeQuery = window.matchMedia('(prefers-color-scheme: light)');
-  schemeQuery.addEventListener('change', () => {
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
     invalidatePalette();
     requestDraw();
   });
@@ -225,7 +291,7 @@
   }
 
   applyTheme(el.theme.value);
-  buildEdgeLegend();
+  rebuild();
   syncControls();
   updateStats();
   requestAnimationFrame(frame);
@@ -244,14 +310,20 @@
     setRunning,
     restart,
     applyTheme,
+    selectScenario,
+    scenarios: SCENARIOS,
+    selectScenarioById: (id) => selectScenario(SCENARIOS.find((s) => s.id === id)),
     isRunning: () => clock.running,
     dotPositions: () => networkView.dotPositions(),
     snapshot: () => ({
+      scenario: graph.scenario.id,
       running: clock.running,
       round: sim.round,
       simTime: clock.simTime,
       avgCost: sim.avgCost(),
       counts: Array.from(sim.counts),
+      enabled: Array.from(graph.enabled),
+      flows: graph.edgeFlows(sim.counts),
       historyLength: sim.history.length,
       settled: sim.atEquilibrium(),
       dots: networkView.dotPositions(),

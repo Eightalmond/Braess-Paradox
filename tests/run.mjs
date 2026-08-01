@@ -24,6 +24,9 @@ const PAGE_URL = pathToFileURL(path.join(ROOT, 'index.html')).href;
 const SHOT_DIR = path.join(ROOT, 'tests', 'screenshots');
 
 const filter = process.argv[2];
+// The classic network's one free road. Buttons are generated per toggleable edge,
+// so they are addressed by edge key rather than by a fixed id.
+const AB = '[data-edge="AB"]';
 const results = [];
 let browser;
 
@@ -98,6 +101,27 @@ const maxLapProgress = (a, b) => {
   }
   return worst;
 };
+
+/** Screenshot the page and assert the network canvas actually rendered. */
+async function shoot(page, name) {
+  const file = path.join(SHOT_DIR, `${name}.png`);
+  await page.screenshot({ path: file, fullPage: true });
+  const { size } = await fs.stat(file);
+  assert(size > 20000, `${name} screenshot looks empty (${size} bytes)`);
+
+  // A rendered network canvas must not be a single flat colour.
+  const distinct = await page.evaluate(() => {
+    const c = document.getElementById('network');
+    const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const seen = new Set();
+    for (let i = 0; i < data.length; i += 4 * 97) {
+      seen.add(`${data[i]},${data[i + 1]},${data[i + 2]},${data[i + 3]}`);
+    }
+    return seen.size;
+  });
+  assert(distinct > 20, `${name}: network canvas has only ${distinct} distinct colours — probably blank`);
+  console.log(`        wrote ${path.relative(ROOT, file)} (${(size / 1024).toFixed(0)} KB)`);
+}
 
 // ------------------------------------------------------------------- the tests
 
@@ -325,7 +349,7 @@ async function main() {
   await test('reset returns every piece of state to a cold start', async (page) => {
     await page.click('#play');
     await page.waitForTimeout(400);
-    await page.click('#shortcut');
+    await page.click(AB);
     await page.waitForTimeout(300);
     await page.click('#reset');
     await frames(page, 3);
@@ -339,10 +363,10 @@ async function main() {
     assert(s.counts[0] === N && s.counts[1] === 0 && s.counts[2] === 0, `counts ${s.counts}`);
     assert(s.dots.every((d) => d.route === 0), 'dots not all back on R1 after reset');
     assert(
-      await page.evaluate(() => !window.Braess.app.graph.shortcutEnabled),
-      'reset must remove the shortcut'
+      await page.evaluate(() => window.Braess.app.graph.enabled.size === 0),
+      'reset must remove every free road'
     );
-    assert((await page.textContent('#shortcut')).includes('Add'), 'shortcut button label desynced');
+    assert((await page.textContent(AB)).includes('Add'), 'road button label desynced');
 
     // Fractional round carry must not survive a reset and fire a free round.
     await page.waitForTimeout(300);
@@ -351,7 +375,7 @@ async function main() {
   });
 
   await test('removing the shortcut leaves no dots on the deleted road', async (page) => {
-    await page.click('#shortcut');
+    await page.click(AB);
     await page.click('#play');
     await page.waitForTimeout(1500); // let traffic pile onto R3
     await page.click('#play');
@@ -362,7 +386,7 @@ async function main() {
       'expected dots on the shortcut route before removing it'
     );
 
-    await page.click('#shortcut'); // remove it while paused
+    await page.click(AB); // remove it while paused
     const s = await snapshot(page);
     assert(!s.dots.some((d) => d.route === 2), 'dots still driving the removed shortcut');
     assert(s.counts[2] === 0, 'agents still assigned to the removed route');
@@ -443,8 +467,8 @@ async function main() {
   await test('convergence claims still hold after the refactor', async (page) => {
     for (const N of [40, 200, 1000]) {
       const out = await page.evaluate((population) => {
-        const { Graph, Simulation } = window.Braess;
-        const graph = new Graph(population);
+        const { Graph, Simulation, SCENARIOS } = window.Braess;
+        const graph = new Graph(SCENARIOS[0], population);
         const sim = new Simulation(graph);
 
         const run = (rounds) => {
@@ -463,12 +487,12 @@ async function main() {
         const settledAt = sim.history.findIndex((h, i) => i > 0 && Math.abs(h.avgCost - 65) < 0.5);
 
         // Phase 2: add the shortcut. Expect everyone on R3 at 80.
-        sim.toggleShortcut();
+        sim.toggleEdge('AB');
         run(3000);
         const withShortcut = { cost: sim.avgCost(), counts: Array.from(sim.counts), ...stats(tail(1000)) };
 
         // Phase 3: take it away again. Expect a relaxation back to 65.
-        sim.toggleShortcut();
+        sim.toggleEdge('AB');
         run(3000);
         const removed = { cost: sim.avgCost(), counts: Array.from(sim.counts), ...stats(tail(1000)) };
 
@@ -492,51 +516,221 @@ async function main() {
 
       // No thrashing: once settled, the last 1000 rounds of each phase must be
       // flat and switch-free, not oscillating around a near-tie.
-      for (const [phase, s] of Object.entries(out)) {
-        if (!s || typeof s.switches !== 'number') continue;
-        assert(s.switches === 0, `N=${N}: ${s.switches} switches in the last 1000 rounds of ${phase}`);
-        assertClose(s.max - s.min, 0, 0.01, `N=${N}: avg cost band over the last 1000 rounds of ${phase}`);
+      for (const [phase, st] of Object.entries(out)) {
+        if (!st || typeof st.switches !== 'number') continue;
+        assert(st.switches === 0, `N=${N}: ${st.switches} switches in the last 1000 rounds of ${phase}`);
+        assertClose(st.max - st.min, 0, 0.01, `N=${N}: avg cost band over the last 1000 rounds of ${phase}`);
       }
       console.log(
-        `        N=${N}: 65 → ${out.withShortcut.cost.toFixed(1)} → ${out.removed.cost.toFixed(1)}` +
+        `        classic N=${N}: 65 → ${out.withShortcut.cost.toFixed(1)} → ${out.removed.cost.toFixed(1)}` +
           `, settled by round ${out.settledAt}, 0 switches in each tail`
       );
     }
+  });
+
+  await test('double network compounds the paradox: 130 → 145 → 160', async (page) => {
+    for (const N of [40, 200, 1000]) {
+      const out = await page.evaluate((population) => {
+        const { Graph, Simulation, SCENARIOS } = window.Braess;
+        const scenario = SCENARIOS.find((s) => s.id === 'double');
+        const graph = new Graph(scenario, population);
+        const sim = new Simulation(graph);
+
+        const run = (rounds) => {
+          for (let i = 0; i < rounds; i++) sim.step();
+        };
+        const tail = (n) => sim.history.slice(-n);
+        const phase = () => {
+          const rows = tail(1000);
+          const flows = graph.edgeFlows(sim.counts);
+          return {
+            cost: sim.avgCost(),
+            settled: sim.atEquilibrium(),
+            // The equilibrium is unique in edge flows but not in route counts:
+            // any mix leaving each congestible edge at the same load is equally
+            // an equilibrium, so the flows are what must be asserted.
+            congestible: Object.fromEntries(
+              Object.entries(flows).filter(([k]) => graph.edges[k].congestible)
+            ),
+            switches: rows.reduce((a, r) => a + r.switches, 0),
+            band: Math.max(...rows.map((r) => r.avgCost)) - Math.min(...rows.map((r) => r.avgCost)),
+          };
+        };
+
+        run(3000);
+        const none = phase();
+        sim.toggleEdge('A1B1');
+        run(3000);
+        const first = phase();
+        sim.toggleEdge('A2B2');
+        run(3000);
+        const both = phase();
+        // Demolish only the first road: the second half must stay collapsed.
+        sim.toggleEdge('A1B1');
+        run(3000);
+        const second = phase();
+
+        return { none, first, both, second, routes: graph.routes.length };
+      }, N);
+
+      assert(out.routes === 9, `expected 9 enumerated routes, got ${out.routes}`);
+      const half = N / 2;
+      const expected = {
+        none: [130, { SA1: half, B1M: half, MA2: half, B2T: half }],
+        first: [145, { SA1: N, B1M: N, MA2: half, B2T: half }],
+        both: [160, { SA1: N, B1M: N, MA2: N, B2T: N }],
+        second: [145, { SA1: half, B1M: half, MA2: N, B2T: N }],
+      };
+
+      for (const [name, [cost, flows]] of Object.entries(expected)) {
+        const got = out[name];
+        assertClose(got.cost, cost, 0.01, `N=${N}: ${name} equilibrium cost`);
+        assert(got.settled, `N=${N}: ${name} did not reach equilibrium in 3000 rounds`);
+        for (const [edge, load] of Object.entries(flows)) {
+          assert(
+            got.congestible[edge] === load,
+            `N=${N}: ${name} load on ${edge} is ${got.congestible[edge]}, want ${load}`
+          );
+        }
+        assert(got.switches === 0, `N=${N}: ${got.switches} switches in the last 1000 rounds of ${name}`);
+        assertClose(got.band, 0, 0.01, `N=${N}: avg cost band over the last 1000 rounds of ${name}`);
+      }
+
+      // The whole point of this network: each free road costs the same 15 again.
+      assertClose(out.first.cost - out.none.cost, 15, 0.01, `N=${N}: first road's damage`);
+      assertClose(out.both.cost - out.first.cost, 15, 0.01, `N=${N}: second road's damage`);
+      console.log(
+        `        double  N=${N}: ${out.none.cost.toFixed(0)} → ${out.first.cost.toFixed(0)} → ` +
+          `${out.both.cost.toFixed(0)}, one removed → ${out.second.cost.toFixed(0)}, 0 switches in each tail`
+      );
+    }
+  });
+
+  await test('scenario tab rebuilds every scenario-shaped piece of state', async (page) => {
+    // Dirty the classic network first, so a stale fragment would show up.
+    await page.click(AB);
+    await page.click('#play');
+    await page.waitForTimeout(600);
+
+    await page.click('.tab:nth-child(2)');
+    await frames(page, 3);
+
+    const s = await snapshot(page);
+    const dom = await page.evaluate(() => ({
+      routes: window.Braess.app.graph.routes.length,
+      nodes: Object.keys(window.Braess.app.graph.nodes),
+      tableRows: document.querySelectorAll('#route-rows tr').length,
+      roadButtons: Array.from(document.querySelectorAll('#shortcut-buttons button')).map(
+        (b) => b.dataset.edge
+      ),
+      legendRows: document.querySelectorAll('#edge-legend li').length,
+      notes: document.querySelectorAll('#scenario-notes li').length,
+      activeTabs: Array.from(document.querySelectorAll('.tab.active')).map((b) => b.textContent),
+      theoryLines: window.Braess.app.graph.theory.length,
+      dots: window.Braess.app.networkView.visualRoute.length,
+    }));
+
+    assert(s.scenario === 'double', `switched to ${s.scenario}`);
+    assert(s.running === false, 'switching scenario must leave the clock stopped');
+    assert(s.round === 0, `round is ${s.round} after switching`);
+    assert(s.historyLength === 1, `history has ${s.historyLength} entries after switching`);
+    assert(s.enabled.length === 0, `free roads ${s.enabled} carried over from the last network`);
+    assert(dom.routes === 9 && dom.tableRows === 9, `route table has ${dom.tableRows} rows for 9 routes`);
+    assert(dom.legendRows === 10, `legend has ${dom.legendRows} rows for 10 edges`);
+    assert(dom.notes === 3, `walkthrough has ${dom.notes} steps`);
+    assert(dom.theoryLines === 3, `chart has ${dom.theoryLines} reference lines`);
+    assert(dom.nodes.join() === 'S,A1,B1,M,A2,B2,T', `nodes are ${dom.nodes}`);
+    assert(dom.roadButtons.join() === 'A1B1,A2B2', `road buttons are ${dom.roadButtons}`);
+    assert(dom.activeTabs.length === 1 && dom.activeTabs[0] === 'Double Braess', `active tab ${dom.activeTabs}`);
+    // Dots must describe the new network, not index into the old route list.
+    assert(s.counts[0] === 100, `counts[0] is ${s.counts[0]} after switching`);
+    assert(s.dots.every((d) => d.route === 0), 'dots not rebuilt onto the first route');
+    assert(s.dots.every((d) => Number.isFinite(d.x) && Number.isFinite(d.y)), 'dot positions are NaN');
+
+    // And back again, to prove a scenario object survives being unloaded.
+    await page.click('.tab:nth-child(1)');
+    await frames(page, 3);
+    const back = await snapshot(page);
+    assert(back.scenario === 'classic', `switched back to ${back.scenario}`);
+    assert(back.counts.length === 3, `classic has ${back.counts.length} routes after a round trip`);
+    assertClose(back.avgCost, 85, 0.01, 'classic did not return to its cold-start cost');
+  });
+
+  await test('the two free roads are independent', async (page) => {
+    await page.evaluate(() => window.Braess.app.selectScenarioById('double'));
+    await frames(page, 3);
+
+    await page.click('[data-edge="A1B1"]');
+    let s = await snapshot(page);
+    assert(s.enabled.join() === 'A1B1', `enabled is ${s.enabled} after building the first road`);
+    assert(
+      (await page.textContent('[data-edge="A2B2"]')).includes('Add'),
+      'building one road changed the other button'
+    );
+
+    await page.click('[data-edge="A2B2"]');
+    s = await snapshot(page);
+    assert(s.enabled.sort().join() === 'A1B1,A2B2', `enabled is ${s.enabled} with both roads`);
+
+    // Run to the both-roads equilibrium, then demolish only the first. Every
+    // route needing A1B1 dies at once — six of the nine — and no dot may be left
+    // driving any of them.
+    await page.click('#play');
+    await page.waitForFunction(() => window.Braess.app.sim.atEquilibrium(), null, { timeout: 20000 });
+    const settled = await snapshot(page);
+    assertClose(settled.avgCost, 160, 0.01, 'both-roads equilibrium');
+
+    await page.click('[data-edge="A1B1"]');
+    const after = await snapshot(page);
+    const dead = await page.evaluate(() =>
+      window.Braess.app.graph.routes
+        .map((r, i) => (window.Braess.app.graph.isRouteActive(i) ? null : i))
+        .filter((i) => i !== null)
+    );
+    assert(dead.length === 3, `expected 3 routes to die with A1B1, got ${dead.length}`);
+    assert(!after.dots.some((d) => dead.includes(d.route)), 'dots still driving a demolished route');
+    assert(
+      dead.every((i) => after.counts[i] === 0),
+      'agents still assigned to a demolished route'
+    );
+    assert(after.enabled.join() === 'A2B2', `enabled is ${after.enabled} after demolishing A1B1`);
   });
 
   // --- 4. screenshots, both themes ---
 
   for (const scheme of ['dark', 'light']) {
     await test(
-      `screenshot check (${scheme})`,
+      `screenshot check (classic, ${scheme})`,
       async (page) => {
-        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.setViewportSize({ width: 1280, height: 980 });
         await page.click('#play');
         await page.waitForFunction(() => window.Braess.app.sim.atEquilibrium(), null, { timeout: 15000 });
-        await page.click('#shortcut');
+        await page.click(AB);
         await page.click('#play');
         await page.waitForFunction(() => window.Braess.app.sim.counts[2] > 0, null, { timeout: 15000 });
         await page.waitForTimeout(1200);
         await page.evaluate(() => window.Braess.app.setRunning(false));
         await frames(page, 5);
+        await shoot(page, `classic-${scheme}`);
+      },
+      { colorScheme: scheme }
+    );
 
-        const file = path.join(SHOT_DIR, `${scheme}.png`);
-        await page.screenshot({ path: file, fullPage: true });
-        const { size } = await fs.stat(file);
-        assert(size > 20000, `screenshot looks empty (${size} bytes)`);
+    await test(
+      `screenshot check (double, ${scheme})`,
+      async (page) => {
+        await page.setViewportSize({ width: 1280, height: 1080 });
+        await page.evaluate(() => window.Braess.app.selectScenarioById('double'));
+        await page.click('[data-edge="A1B1"]');
+        await page.click('[data-edge="A2B2"]');
+        await page.click('#play');
+        await page.waitForFunction(() => window.Braess.app.sim.atEquilibrium(), null, { timeout: 20000 });
+        await frames(page, 5);
 
-        // A rendered network canvas must not be a single flat colour.
-        const distinct = await page.evaluate(() => {
-          const c = document.getElementById('network');
-          const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-          const seen = new Set();
-          for (let i = 0; i < data.length; i += 4 * 97) {
-            seen.add(`${data[i]},${data[i + 1]},${data[i + 2]},${data[i + 3]}`);
-          }
-          return seen.size;
-        });
-        assert(distinct > 20, `network canvas has only ${distinct} distinct colours — probably blank`);
-        console.log(`        wrote ${path.relative(ROOT, file)} (${(size / 1024).toFixed(0)} KB)`);
+        // The picture is only worth keeping if it shows the punchline.
+        const s = await snapshot(page);
+        assertClose(s.avgCost, 160, 0.01, 'double network screenshot is not at the 160 equilibrium');
+        await shoot(page, `double-${scheme}`);
       },
       { colorScheme: scheme }
     );

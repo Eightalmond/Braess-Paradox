@@ -5,7 +5,13 @@ because of a mistake, and not because anyone behaved irrationally — precisely
 *because* everyone behaved rationally. This is Braess's Paradox, and it's one of
 the cleanest demonstrations that a Nash equilibrium need not be efficient.
 
-This repo is a small self-contained web app that lets you watch it happen.
+This repo is a small self-contained web app that lets you watch it happen, in two
+networks:
+
+| Tab | Network | The point |
+| --- | --- | --- |
+| **Classic Braess** | 4 nodes, 1 free shortcut, 3 routes | Adding a free road takes everyone from **65** to **80**. |
+| **Double Braess** | 7 nodes, 2 free roads, 9 routes | The damage compounds: **130 → 145 → 160**, 15 minutes per road. |
 
 ## Running it
 
@@ -16,7 +22,7 @@ open index.html
 That's it. No build step, no server, no dependencies — plain HTML, CSS, and
 JavaScript loaded with `<script>` tags.
 
-## The network
+## The classic network
 
 ```
               A
@@ -73,6 +79,36 @@ The textbook version of this example uses 4000 cars and a cost of `x/100`. The
 congestion coefficient here is normalized as `40/N`, which reproduces those
 exact 65 and 80 figures for any population size.
 
+### The double network: why 130, 145 and 160
+
+The **Double Braess** tab chains two copies of the same gadget:
+
+```
+        A1                A2
+      ↗    ↘            ↗    ↘
+   S    ⋮A1→B1⋮   M   ⋮A2→B2⋮   T
+      ↘    ↗            ↘    ↗
+        B1                B2
+```
+
+Each half is the classic network, so each half costs **65** with its traffic split
+50/50 and **80** once everybody piles onto its free road. A driver picks a
+half-trip in each stage, which is why three options per stage enumerate to nine
+S→T routes.
+
+| Free roads built | Cost per driver |
+| --- | --- |
+| none | 65 + 65 = **130** |
+| one | 80 + 65 = **145** |
+| both | 80 + 80 = **160** |
+
+Each road you build costs every driver another 15 minutes, and each one is
+individually irresistible on the way in — that's the compounding version of the
+same trap. Note that with no free roads the equilibrium is unique in *edge flows*
+but not in route counts: any mix leaving each congestible edge at half load costs
+exactly 130, so 50 drivers on `A1·A2` plus 50 on `B1·B2` is just as much an
+equilibrium as 25 on each of the four routes.
+
 ## How equilibrium is found
 
 There's no equation being solved. The simulation uses **best-response
@@ -98,10 +134,11 @@ in roughly 25 rounds, and to the all-on-R3 state in a few hundred.
 | **Play / Pause** | Runs best-response rounds continuously. Pause halts *everything* — rounds, chart, and the dots, which freeze mid-transit and continue from where they stopped. Auto-pauses on reaching equilibrium. |
 | **Step** | Runs exactly one round and the matching slice of dot motion — useful for watching convergence up close, or confirming that nothing moves once settled. |
 | **Reset** | Puts all drivers back on R1, clears history, removes the shortcut. |
-| **Add / Remove shortcut A→B** | Toggles the extra road. This is the paradox button. |
+| **Add / Remove shortcut** | Toggles a free road. This is the paradox button — one per free road, so the double network has two. |
 | **Rounds/sec** | How fast rounds tick while playing. |
 | **Drivers** | Population size, 20–1000. Changing it restarts the run. The congestion coefficient is renormalized as `40/N`, so the 65 and 80 equilibria hold at every setting — N changes how granular the game is, not what it converges to. |
 | **Theme** | Auto (follow the OS), Light, or Dark. An explicit choice overrides the OS preference. |
+| **Tabs** | Switch network. Each switch restarts the run from a cold start. |
 
 Suggested run-through:
 
@@ -126,14 +163,19 @@ Suggested run-through:
   above that a fixed 400-dot sample is drawn, spread evenly across the
   population, while the route table keeps reporting true counts.
 - **The chart** plots average travel time per round, with dashed reference lines
-  at 65 and 80 and a vertical marker wherever the shortcut was toggled. The jump
-  *upward* right after a marker is the whole point.
+  at each of the network's analytical equilibria and a vertical marker wherever a
+  road was built or demolished. The jump *upward* right after a marker is the
+  whole point.
+- In the **double network**, a route's dot colour encodes both halves of its trip:
+  hue is the first-stage choice (blue via A1, amber via B1, violet via the free
+  road) and lightness the second.
 
 ## Code layout
 
 | File | Responsibility |
 | --- | --- |
-| `js/graph.js` | Network model: nodes, edges, cost functions, route enumeration. |
+| `js/scenarios.js` | The networks, as pure data: nodes, edges, routes, analytical equilibria, walkthrough. |
+| `js/graph.js` | Loads a scenario and owns its runtime state: which free roads exist, congestion coefficients at the current N. |
 | `js/simulation.js` | Driver population, best-response step, equilibrium detection, history log. |
 | `js/clock.js` | The single source of truth for "is the simulation running", and the only code that reads wall time. |
 | `js/render.js` | Canvas drawing — the network, the animated dots, the chart. |
@@ -163,12 +205,14 @@ npm install
 npm test
 ```
 
-17 headless Playwright checks driving the real page. Notably: pause is verified
+22 headless Playwright checks driving the real page. Notably: pause is verified
 by reading actual dot coordinates, letting real animation frames elapse, and
-requiring bit-identical values; equilibrium convergence is re-verified at
-N = 40/200/1000 over 3000 rounds per phase, asserting zero switches and a flat
-cost band once settled; and screenshots are captured in both themes and checked
-for non-blankness. `node tests/run.mjs <substring>` runs a subset.
+requiring bit-identical values; equilibrium convergence is verified for both
+networks at N = 40/200/1000 over 3000 rounds per phase, asserting zero switches
+and a flat cost band once settled; switching tabs is checked against every piece
+of rebuilt DOM and model state; and screenshots are captured for both networks in
+both themes and checked for non-blankness. `node tests/run.mjs <substring>` runs
+a subset.
 
 ## Things worth trying
 

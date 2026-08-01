@@ -20,13 +20,33 @@
  *     repaint a frozen frame without advancing it.
  */
 
-// Violet for the shortcut and its route: the congestion scale already owns
+// Violet for a free road and its route: the congestion scale already owns
 // green→red, so a pink dot on a jammed (red) edge would be invisible.
 const SHORTCUT_COLOR = '#c07cff';
-const ROUTE_COLORS = ['#4a9eff', '#ffb454', SHORTCUT_COLOR];
-const ROUTE_OFFSETS = [-7, 7, 0]; // perpendicular dot offset so shared edges stay legible
-const NO_SHORTCUT_COLOR = '#3ddc97';
+// Marker colour for a demolished road — green, matching the "before" reference
+// line. Named distinctly from scenarios.js: plain <script> tags share one global
+// scope, so a duplicated top-level const is a hard SyntaxError.
+const ROAD_REMOVED_COLOR = '#3ddc97';
 const CHART_WINDOW = 800; // rounds visible in the sliding chart window
+// Total perpendicular spread of the dot lanes, in pixels. Routes sharing an edge
+// are drawn in their own lane so the traffic stays legible; with nine routes the
+// lanes get thin, but the spread stays inside the road.
+const LANE_SPREAD = 14;
+const MAX_LANE_GAP = 7;
+
+/**
+ * Perpendicular offset for a route's dot lane. A scenario may pin a route's lane
+ * explicitly (the classic network centres its shortcut route on the vertical
+ * A→B road); otherwise lanes are spread evenly across the route list.
+ */
+function routeOffset(graph, i) {
+  const pinned = graph.routes[i].offset;
+  if (pinned !== undefined) return pinned;
+  const n = graph.routes.length;
+  if (n < 2) return 0;
+  const gap = Math.min(MAX_LANE_GAP, LANE_SPREAD / (n - 1));
+  return (i - (n - 1) / 2) * gap;
+}
 // Above this population we draw a fixed-size sample of drivers rather than one
 // dot each: 1000 overlapping dots is neither legible nor cheap, and the sample
 // is spread evenly across agent indices so route proportions still read true.
@@ -133,7 +153,7 @@ class NetworkView {
     const out = [];
     for (let j = 0; j < this.travel.length; j++) {
       const r = this.visualRoute[j];
-      const p = this.pointAlong(geoms[r], this.travel[j], ROUTE_OFFSETS[r]);
+      const p = this.pointAlong(geoms[r], this.travel[j], routeOffset(this.graph, r));
       out.push({ x: p.x, y: p.y, route: r, travel: this.travel[j] });
     }
     return out;
@@ -143,7 +163,7 @@ class NetworkView {
     const padX = 46;
     const padY = 40;
     const pos = {};
-    for (const [key, n] of Object.entries(window.Braess.NODES)) {
+    for (const [key, n] of Object.entries(this.graph.nodes)) {
       pos[key] = { x: padX + n.x * (w - 2 * padX), y: padY + n.y * (h - 2 * padY) };
     }
     return pos;
@@ -222,10 +242,10 @@ class NetworkView {
       const a = pos[e.from];
       const b = pos[e.to];
       const flow = flows[key];
-      const enabled = !e.shortcut || this.graph.shortcutEnabled;
+      const enabled = this.graph.isEdgeEnabled(key);
 
       ctx.save();
-      if (e.shortcut && !enabled) {
+      if (e.toggleable && !enabled) {
         ctx.strokeStyle = css('--edge-ghost');
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 8]);
@@ -235,7 +255,7 @@ class NetworkView {
         const hue = 140 - 140 * load;
         ctx.strokeStyle = `hsl(${hue}, 70%, 52%)`;
         ctx.lineWidth = 4 + 12 * load;
-      } else if (e.shortcut) {
+      } else if (e.toggleable) {
         ctx.strokeStyle = SHORTCUT_COLOR;
         ctx.lineWidth = 4;
         ctx.setLineDash([9, 6]);
@@ -250,7 +270,7 @@ class NetworkView {
       ctx.stroke();
       ctx.restore();
 
-      if (e.shortcut && !enabled) continue;
+      if (!enabled) continue;
 
       // --- edge label: current travel time (and load, if congestible) ---
       const mx = (a.x + b.x) / 2;
@@ -261,8 +281,8 @@ class NetworkView {
       // Push the label off the road, perpendicular to it. The vertical A→B
       // shortcut is the exception: nudge it sideways so it clears the dots.
       const lift = 22;
-      const tx = e.shortcut ? mx + 34 : mx - (dy / len) * lift;
-      const ty = e.shortcut ? my : my + (dx / len) * lift;
+      const tx = e.toggleable ? mx + 34 : mx - (dy / len) * lift;
+      const ty = e.toggleable ? my : my + (dx / len) * lift;
 
       ctx.save();
       ctx.font = '600 13px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -282,8 +302,8 @@ class NetworkView {
     const geoms = this.graph.routes.map((_, i) => this.routeGeometry(i, pos));
     for (let j = 0; j < this.travel.length; j++) {
       const r = this.visualRoute[j];
-      const p = this.pointAlong(geoms[r], this.travel[j], ROUTE_OFFSETS[r]);
-      ctx.fillStyle = ROUTE_COLORS[r];
+      const p = this.pointAlong(geoms[r], this.travel[j], routeOffset(this.graph, r));
+      ctx.fillStyle = this.graph.routes[r].color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
       ctx.fill();
@@ -339,8 +359,8 @@ class ChartView {
     const plotH = h - padT - padB;
 
     const theory = this.graph.theory;
-    let lo = Math.min(theory.without, theory.with);
-    let hi = Math.max(theory.without, theory.with);
+    let lo = Math.min(...theory.map((t) => t.value));
+    let hi = Math.max(...theory.map((t) => t.value));
     for (const p of view) {
       lo = Math.min(lo, p.avgCost);
       hi = Math.max(hi, p.avgCost);
@@ -367,10 +387,7 @@ class ChartView {
     // reference lines for the analytical equilibria
     ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.textBaseline = 'middle';
-    for (const [value, label, color] of [
-      [theory.without, 'no shortcut', NO_SHORTCUT_COLOR],
-      [theory.with, 'with shortcut', SHORTCUT_COLOR],
-    ]) {
+    for (const { value, label, color } of theory) {
       const y = sy(value);
       ctx.save();
       ctx.strokeStyle = color;
@@ -391,12 +408,12 @@ class ChartView {
       ctx.globalAlpha = 1;
     }
 
-    // shortcut toggle markers
-    for (const t of this.sim.shortcutToggles) {
+    // markers wherever a road was built or demolished
+    for (const t of this.sim.toggles) {
       if (t.round < x0 || t.round > x1) continue;
       const x = sx(t.round);
       ctx.save();
-      ctx.strokeStyle = t.enabled ? SHORTCUT_COLOR : NO_SHORTCUT_COLOR;
+      ctx.strokeStyle = t.enabled ? SHORTCUT_COLOR : ROAD_REMOVED_COLOR;
       ctx.setLineDash([3, 4]);
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -432,5 +449,4 @@ class ChartView {
 window.Braess = window.Braess || {};
 window.Braess.NetworkView = NetworkView;
 window.Braess.ChartView = ChartView;
-window.Braess.ROUTE_COLORS = ROUTE_COLORS;
 window.Braess.invalidatePalette = invalidatePalette;

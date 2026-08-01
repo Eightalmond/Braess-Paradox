@@ -24,13 +24,13 @@ class Simulation {
 
   reset() {
     const N = this.graph.population;
-    this.graph.shortcutEnabled = false;
+    this.graph.resetToggles();
     // Start everybody on route 1 so convergence is visible rather than instant.
     this.agents = new Int8Array(N); // agents[i] = route index
     this.counts = this.graph.routes.map((_, i) => (i === 0 ? N : 0));
     this.round = 0;
-    this.history = []; // { round, avgCost, counts, shortcut }
-    this.shortcutToggles = []; // rounds at which the shortcut was toggled
+    this.history = []; // { round, avgCost, counts, enabled, switches }
+    this.toggles = []; // { round, key, enabled } for every road built or demolished
     this.record(0);
   }
 
@@ -113,24 +113,29 @@ class Simulation {
     return true;
   }
 
-  toggleShortcut() {
-    this.graph.shortcutEnabled = !this.graph.shortcutEnabled;
+  /**
+   * Build or demolish a toggleable road.
+   *
+   * Demolishing can strand agents on routes that no longer exist — and with
+   * several toggleable roads it can strand them on more than one route at once,
+   * so every inactive route is swept rather than the one that owned the edge.
+   * Everybody stranded falls back to the first remaining route, deliberately
+   * *not* a balanced split, so you can watch best response find the new
+   * equilibrium instead of being handed it.
+   */
+  toggleEdge(key) {
+    const enabled = this.graph.toggleEdge(key);
+    const fallback = this.graph.activeRouteIndices()[0];
 
-    if (!this.graph.shortcutEnabled) {
-      // The road closed under them. Stranded agents all fall back to the first
-      // remaining route — deliberately *not* a balanced split, so you can watch
-      // best response find the new equilibrium instead of being handed it.
-      const shortcutRoute = this.graph.routes.findIndex((r) => r.needsShortcut);
-      const fallback = this.graph.activeRouteIndices()[0];
-      for (let i = 0; i < this.agents.length; i++) {
-        if (this.agents[i] !== shortcutRoute) continue;
-        this.agents[i] = fallback;
-        this.counts[shortcutRoute] -= 1;
-        this.counts[fallback] += 1;
-      }
+    for (let i = 0; i < this.agents.length; i++) {
+      const r = this.agents[i];
+      if (this.graph.isRouteActive(r)) continue;
+      this.agents[i] = fallback;
+      this.counts[r] -= 1;
+      this.counts[fallback] += 1;
     }
 
-    this.shortcutToggles.push({ round: this.round, enabled: this.graph.shortcutEnabled });
+    this.toggles.push({ round: this.round, key, enabled });
     this.record(0);
   }
 
@@ -139,7 +144,7 @@ class Simulation {
       round: this.round,
       avgCost: this.avgCost(),
       counts: this.counts.slice(),
-      shortcut: this.graph.shortcutEnabled,
+      enabled: Array.from(this.graph.enabled),
       switches,
     });
   }

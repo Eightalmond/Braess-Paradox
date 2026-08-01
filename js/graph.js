@@ -1,95 +1,96 @@
 /*
  * graph.js — the road network model.
  *
- * Classic Braess network:
- *
- *            A
- *          /   \
- *   c*x  /       \  45
- *      /           \
- *     S ---(A→B)--- T        (A→B is the "shortcut", cost 0, toggleable)
- *      \           /
- *   45   \       /  c*x
- *          \   /
- *            B
+ * A Graph is a loaded scenario (see scenarios.js) plus the runtime state that
+ * goes with it: which toggleable roads currently exist, and how the congestion
+ * coefficients scale to the current population.
  *
  * Edge travel time is affine in its load: cost(x) = base + coeff * x.
  *
- * The textbook version uses 4000 cars with cost x/100 on the congestible
+ * The textbook Braess version uses 4000 cars with cost x/100 on the congestible
  * edges, giving 65 min per driver without the shortcut and 80 with it. We want
  * those same headline numbers for whatever population size animates nicely, so
- * the congestion coefficient is normalized as coeff = CONGESTION_AT_FULL / N.
- * Then:
+ * each congestible edge's coefficient is normalized as congestionAtFull / N.
+ * Then, in the classic network:
  *   - no shortcut, 50/50 split:  CONGESTION_AT_FULL/2 + CONSTANT_COST = 65
  *   - shortcut, everyone on it:  2 * CONGESTION_AT_FULL              = 80
+ *
+ * Two invariants callers must respect, both because they resize or reshape the
+ * per-agent arrays that Simulation and NetworkView own:
+ *   - after `load()`, call `sim.reset()` and `view.resetAgents()`
+ *   - after `setPopulation()`, the same
+ * main.js does both through a single synchronous `restart()`.
  */
 
-const CONSTANT_COST = 45; // travel time of the two fixed-cost edges
-const CONGESTION_AT_FULL = 40; // travel time of a congestible edge at full load
-
-const NODES = {
-  S: { x: 0.07, y: 0.5 },
-  A: { x: 0.5, y: 0.16 },
-  B: { x: 0.5, y: 0.84 },
-  T: { x: 0.93, y: 0.5 },
-};
-
-const ROUTE_DEFS = [
-  { id: 'R1', name: 'S→A→T', edges: ['SA', 'AT'], path: ['S', 'A', 'T'] },
-  { id: 'R2', name: 'S→B→T', edges: ['SB', 'BT'], path: ['S', 'B', 'T'] },
-  {
-    id: 'R3',
-    name: 'S→A→B→T',
-    edges: ['SA', 'AB', 'BT'],
-    path: ['S', 'A', 'B', 'T'],
-    needsShortcut: true,
-  },
-];
-
 class Graph {
-  constructor(population) {
-    this.shortcutEnabled = false;
+  constructor(scenario, population) {
+    this.load(scenario, population);
+  }
 
-    this.edges = {
-      SA: { from: 'S', to: 'A', base: 0, coeff: 0, congestible: true },
-      AT: { from: 'A', to: 'T', base: CONSTANT_COST, coeff: 0, congestible: false },
-      SB: { from: 'S', to: 'B', base: CONSTANT_COST, coeff: 0, congestible: false },
-      BT: { from: 'B', to: 'T', base: 0, coeff: 0, congestible: true },
-      AB: { from: 'A', to: 'B', base: 0, coeff: 0, congestible: false, shortcut: true },
-    };
-
-    this.routes = ROUTE_DEFS;
+  /** Swap in a different network. Discards all toggle state. */
+  load(scenario, population = this.population) {
+    this.scenario = scenario;
+    this.nodes = scenario.nodes;
+    // Deep-ish copy of the edges: `coeff` is per-population runtime state, and a
+    // scenario object must stay reusable after being loaded and unloaded.
+    this.edges = {};
+    for (const [key, e] of Object.entries(scenario.edges)) {
+      this.edges[key] = { ...e, coeff: 0 };
+    }
+    this.routes = scenario.routes;
+    this.enabled = new Set(); // toggleable edges that currently exist
     this.setPopulation(population);
   }
 
   /**
-   * Resize the population. The congestion coefficient is renormalized so the
-   * headline equilibria stay at 65 and 80 for any N (see the header comment) —
-   * i.e. N changes how granular the game is, never what it converges to.
-   *
-   * Callers must follow this with `sim.reset()`: the per-agent arrays are sized
-   * to N and would otherwise be stale. Population is deliberately *not* mutated
-   * anywhere else, so that pairing is the only invariant to hold.
+   * Resize the population. Congestion coefficients are renormalized so the
+   * scenario's analytical equilibria hold at any N — N changes how granular the
+   * game is, never what it converges to.
    */
   setPopulation(population) {
     this.population = population;
-    const coeff = CONGESTION_AT_FULL / population;
     for (const e of Object.values(this.edges)) {
-      if (e.congestible) e.coeff = coeff;
+      if (e.congestible) e.coeff = e.congestionAtFull / population;
     }
+  }
+
+  /** Remove every toggleable road, i.e. back to the base network. */
+  resetToggles() {
+    this.enabled.clear();
+  }
+
+  /** The toggleable edges, in scenario order — one button each in the UI. */
+  toggleableEdges() {
+    return Object.entries(this.edges)
+      .filter(([, e]) => e.toggleable)
+      .map(([key, e]) => ({ key, label: e.label || `${e.from}→${e.to}` }));
+  }
+
+  isEdgeEnabled(key) {
+    const e = this.edges[key];
+    return !e.toggleable || this.enabled.has(key);
+  }
+
+  toggleEdge(key) {
+    if (this.enabled.has(key)) this.enabled.delete(key);
+    else this.enabled.add(key);
+    return this.enabled.has(key);
+  }
+
+  /** A route exists only while every toggleable road it needs exists. */
+  isRouteActive(i) {
+    const requires = this.routes[i].requires;
+    if (!requires) return true;
+    return requires.every((key) => this.enabled.has(key));
   }
 
   /** Indices into this.routes that agents are currently allowed to use. */
   activeRouteIndices() {
     const active = [];
     for (let i = 0; i < this.routes.length; i++) {
-      if (!this.routes[i].needsShortcut || this.shortcutEnabled) active.push(i);
+      if (this.isRouteActive(i)) active.push(i);
     }
     return active;
-  }
-
-  isRouteActive(i) {
-    return !this.routes[i].needsShortcut || this.shortcutEnabled;
   }
 
   /** Per-edge load implied by a per-route agent count. */
@@ -121,20 +122,16 @@ class Graph {
 
   /** Analytical equilibrium costs, for reference lines on the chart. */
   get theory() {
-    return {
-      without: CONSTANT_COST + CONGESTION_AT_FULL / 2, // 65
-      with: 2 * CONGESTION_AT_FULL, // 80
-    };
+    return this.scenario.theory;
   }
 
-  /** Human-readable cost function, e.g. "45" or "x / 100 (0 → 40)". */
+  /** Human-readable cost function, e.g. "45" or "40 · (load / 100)". */
   edgeFormula(key) {
     const e = this.edges[key];
-    if (e.congestible) return `${CONGESTION_AT_FULL} · (load / ${this.population})`;
+    if (e.congestible) return `${e.congestionAtFull} · (load / ${this.population})`;
     return `${e.base}`;
   }
 }
 
 window.Braess = window.Braess || {};
 window.Braess.Graph = Graph;
-window.Braess.NODES = NODES;

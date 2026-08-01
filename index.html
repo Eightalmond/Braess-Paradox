@@ -14,14 +14,17 @@
       </p>
     </header>
 
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+
     <main>
       <section class="panel network-panel">
+        <p class="tagline" id="tagline"></p>
         <canvas id="network"></canvas>
         <div class="controls">
           <button id="play" class="primary" aria-pressed="false">▶ Play</button>
           <button id="step">Step</button>
           <button id="reset">Reset</button>
-          <button id="shortcut" class="shortcut">＋ Add shortcut A→B</button>
+          <span id="shortcut-buttons" class="shortcut-buttons"></span>
         </div>
         <div class="controls sliders">
           <label class="slider">
@@ -75,16 +78,11 @@
           <ul id="edge-legend"></ul>
           <p>
             Congestible edges get slower as more drivers use them; the fixed edges cost
-            <strong>45</strong> no matter what. The dashed <strong>A→B</strong> shortcut is free
-            (cost&nbsp;0).
+            <strong>45</strong> no matter what. The dashed roads are free (cost&nbsp;0) and can be
+            built or demolished while it runs.
           </p>
           <h2>How to read it</h2>
-          <ol>
-            <li>Press <strong>Play</strong>. Drivers spread out until the two routes tie at <strong>65</strong> — that's the equilibrium.</li>
-            <li>Press <strong>Add shortcut</strong>. The free road looks like a bargain, so everyone takes it.</li>
-            <li>Watch the chart: average travel time settles at <strong>80</strong>. A free road made every single driver worse off.</li>
-            <li>Remove the shortcut and the system relaxes back to 65.</li>
-          </ol>
+          <ol id="scenario-notes"></ol>
         </div>
       </aside>
 
@@ -94,6 +92,7 @@
       </section>
     </main>
 
+    <script src="js/scenarios.js"></script>
     <script src="js/graph.js"></script>
     <script src="js/simulation.js"></script>
     <script src="js/clock.js"></script>

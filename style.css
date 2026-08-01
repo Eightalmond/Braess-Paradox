@@ -84,6 +84,43 @@ h1 {
   color: var(--text-dim);
 }
 
+.tabs {
+  max-width: 1180px;
+  margin: 0 auto 14px;
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.tab {
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  color: var(--text-dim);
+  font-weight: 600;
+  padding: 8px 14px;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--text);
+  border-color: transparent;
+}
+
+.tab.active {
+  background: var(--panel);
+  border-color: var(--panel-border);
+  border-bottom-color: var(--panel);
+  color: var(--text);
+}
+
+.tagline {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
 main {
   max-width: 1180px;
   margin: 0 auto;
@@ -157,6 +194,12 @@ button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+.shortcut-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 button.shortcut {

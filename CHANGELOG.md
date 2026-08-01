@@ -1,5 +1,72 @@
 # Changelog
 
+## V3 — a second network, behind tabs
+
+### What's new
+
+A **Double Braess** tab: two Braess gadgets chained in series, with two free
+roads that can be built and demolished independently. Each half of the trip is
+its own copy of the classic network, so the paradox *compounds* — 130 door to
+door with no free roads, 145 with one, 160 with both. Every road you add costs
+every driver another 15 minutes, and each one is individually irresistible on the
+way in.
+
+Verified against the simulation at N = 40, 200 and 1000: all four states (none,
+first road, both, second road only) reach exact analytical equilibrium with zero
+switches in the last 1000 rounds of each phase.
+
+### Refactor
+
+The network was hardcoded across four files. It is now data, in a new
+`js/scenarios.js`, and `Graph` is a loader for it:
+
+- **Any number of toggleable roads.** `graph.shortcutEnabled` — a single boolean —
+  became `graph.enabled`, a set of edge keys. Routes declare which free roads
+  they depend on via `requires` and exist only while all of them do.
+  `sim.toggleShortcut()` became `sim.toggleEdge(key)`, which sweeps *every*
+  inactive route when a road closes rather than the one route that owned the
+  edge — with two roads, demolishing one strands agents on three routes at once.
+- **`window.Braess.NODES` is gone.** It was a global that only worked because
+  there was exactly one network; node positions now come from `graph.nodes`.
+- **Route colours and dot lanes come from the scenario.** `ROUTE_COLORS` and
+  `ROUTE_OFFSETS` were fixed-length arrays indexed by route. The double network
+  has nine routes, so colour is now a route property (hue carries the first-stage
+  choice, lightness the second) and lanes are spread across however many routes
+  exist. The classic network pins its three lanes so it looks exactly as it did.
+- **Chart reference lines are a list**, not a `{ without, with }` pair — the
+  double network has three.
+- One build/demolish **button per free road**, generated from
+  `graph.toggleableEdges()`, plus a per-scenario tagline and walkthrough.
+
+### Desyncs this could have introduced, and what prevents them
+
+Switching networks changes the route count, the node set, the edge set and the
+number of free roads at once — the same class of bug as V2's pause, with more
+surface. Every switch goes through the V2 discipline: pause the clock, then
+`graph.load()` → `rebuild()` → `restart()` in one synchronous block, so no frame
+can observe a half-swapped network.
+
+- `sim.reset()` re-derives `counts` from `graph.routes`, so a stale nine-element
+  count array cannot survive a switch to a three-route network.
+- `networkView.resetAgents()` re-derives dot state, so no dot indexes into the
+  old route list. Asserted: after a switch, every dot is on route 0 with finite
+  coordinates.
+- Toggle state, history and the round counter are cleared, so a free road built
+  in one network does not appear enabled in the next.
+- `graph.load()` copies the scenario's edges rather than mutating them, because
+  `coeff` is per-population runtime state and a scenario has to survive being
+  loaded, unloaded and loaded again. Asserted by a round trip back to the
+  classic tab.
+- One that bit during development: plain `<script>` tags share a single global
+  scope, so `BEFORE_COLOR` declared in both `scenarios.js` and `render.js` was a
+  hard `SyntaxError` that took the whole app down. Renamed, and worth remembering
+  before adding another top-level const.
+
+Tests grew from 17 to 22: the double network's convergence at three population
+sizes, a scenario-switch check that inspects every rebuilt piece of DOM and
+model state, free-road independence, and screenshots for both networks in both
+themes.
+
 ## V2 — control state, fixed at the architecture level
 
 ### The pause bug
