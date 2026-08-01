@@ -426,26 +426,26 @@ async function main() {
     await page.selectOption('#theme', 'light');
     await frames(page, 3);
     let bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(244, 246, 250)', `explicit light gave ${bg}`);
+    assert(bg === 'rgb(232, 217, 195)', `explicit light gave ${bg}`);
 
     await page.selectOption('#theme', 'dark');
     await frames(page, 3);
     bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(16, 19, 26)', `explicit dark gave ${bg}`);
+    assert(bg === 'rgb(23, 17, 12)', `explicit dark gave ${bg}`);
 
     await page.selectOption('#theme', 'auto');
     await frames(page, 3);
     bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(16, 19, 26)', `auto under a dark OS gave ${bg}`);
+    assert(bg === 'rgb(23, 17, 12)', `auto under a dark OS gave ${bg}`);
   });
 
   await test('theme picker honours a light OS preference in auto mode', async (page) => {
     const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(244, 246, 250)', `auto under a light OS gave ${bg}`);
+    assert(bg === 'rgb(232, 217, 195)', `auto under a light OS gave ${bg}`);
     await page.selectOption('#theme', 'dark');
     await frames(page, 3);
     const dark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(dark === 'rgb(16, 19, 26)', `explicit dark under a light OS gave ${dark}`);
+    assert(dark === 'rgb(23, 17, 12)', `explicit dark under a light OS gave ${dark}`);
   }, { colorScheme: 'light' });
 
   await test('auto-pause on equilibrium stops the dots too', async (page) => {

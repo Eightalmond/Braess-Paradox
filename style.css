@@ -10,49 +10,52 @@
 
 :root,
 :root[data-theme='dark'] {
-  --bg: #10131a;
-  --panel: #181c26;
-  --panel-border: #262c3a;
-  --text: #e8ecf4;
-  --text-dim: #8b95ab;
-  --accent: #4a9eff;
-  --grid: #2d3548;
-  --node-fill: #222836;
-  --node-stroke: #4a5468;
-  --edge-fixed: #4a5468;
-  --edge-ghost: #333b4d;
-  --badge-bg: #232a38;
+  --bg: #17110c;
+  --panel: #221812;
+  --panel-border: #3d2b20;
+  --text: #f5ece0;
+  --text-dim: #b09a84;
+  --accent: #f0a13c;
+  --accent-ink: #241a10;
+  --grid: #3d2b20;
+  --node-fill: #2b1f18;
+  --node-stroke: #6b5344;
+  --edge-fixed: #6b5344;
+  --edge-ghost: #3a2a20;
+  --badge-bg: #2c1f17;
 }
 
 :root[data-theme='light'] {
-  --bg: #f4f6fa;
-  --panel: #ffffff;
-  --panel-border: #dfe4ee;
-  --text: #1a2030;
-  --text-dim: #6b7488;
-  --accent: #2a72d8;
-  --grid: #d6dce8;
-  --node-fill: #eef1f7;
-  --node-stroke: #a9b3c6;
-  --edge-fixed: #a9b3c6;
-  --edge-ghost: #d3d9e5;
-  --badge-bg: #eef1f7;
+  --bg: #e8d9c3;
+  --panel: #f5ebdb;
+  --panel-border: #d8c5aa;
+  --text: #33241a;
+  --text-dim: #7a6553;
+  --accent: #b45309;
+  --accent-ink: #fdf6ec;
+  --grid: #d8c5aa;
+  --node-fill: #efe1cc;
+  --node-stroke: #b39a7d;
+  --edge-fixed: #a8907a;
+  --edge-ghost: #ddcdb4;
+  --badge-bg: #efe1cc;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --bg: #f4f6fa;
-    --panel: #ffffff;
-    --panel-border: #dfe4ee;
-    --text: #1a2030;
-    --text-dim: #6b7488;
-    --accent: #2a72d8;
-    --grid: #d6dce8;
-    --node-fill: #eef1f7;
-    --node-stroke: #a9b3c6;
-    --edge-fixed: #a9b3c6;
-    --edge-ghost: #d3d9e5;
-    --badge-bg: #eef1f7;
+    --bg: #e8d9c3;
+    --panel: #f5ebdb;
+    --panel-border: #d8c5aa;
+    --text: #33241a;
+    --text-dim: #7a6553;
+    --accent: #b45309;
+    --accent-ink: #fdf6ec;
+    --grid: #d8c5aa;
+    --node-fill: #efe1cc;
+    --node-stroke: #b39a7d;
+    --edge-fixed: #a8907a;
+    --edge-ghost: #ddcdb4;
+    --badge-bg: #efe1cc;
   }
 }
 
@@ -193,7 +196,9 @@ button:hover {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  /* Amber is a light accent, so the label has to be dark ink in dark mode —
+     white on #f0a13c is about 2:1. --accent-ink flips with the theme. */
+  color: var(--accent-ink);
 }
 
 .shortcut-buttons {

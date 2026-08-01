@@ -1,5 +1,13 @@
 # Changelog
 
+## Palette — espresso & amber
+
+Colours only; no layout, markup or behaviour changed. The blue-black/white-grey
+scheme is replaced by warm dark browns with an amber accent, and the light theme
+is parchment rather than white. One thing had to move with it: the primary
+button's label is now `--accent-ink`, dark in dark mode, because white on the
+amber accent is about 2:1.
+
 ## V3 — a second network, behind tabs
 
 ### What's new
