@@ -1,12 +1,24 @@
 # Changelog
 
-## Palette — espresso & amber
+## Palette — forest, light only
 
-Colours only; no layout, markup or behaviour changed. The blue-black/white-grey
-scheme is replaced by warm dark browns with an amber accent, and the light theme
-is parchment rather than white. One thing had to move with it: the primary
-button's label is now `--accent-ink`, dark in dark mode, because white on the
-amber accent is about 2:1.
+One fixed theme: pale sage background, pine-tinted panels, a deep green accent.
+
+The dark/light switch is gone, and with it the `prefers-color-scheme` query, the
+`data-theme` attribute, and the `applyTheme` wiring. Every colour now resolves to
+exactly one value, so the canvas's cached CSS variables never need invalidating.
+
+Two knock-on changes rather than pure recolouring:
+
+- The primary button's label is `--accent-ink` instead of a hardcoded `#fff`,
+  since the accent is no longer guaranteed to be dark.
+- The "repaint a frozen frame without advancing it" guarantee was covered by a
+  theme-change test. A resize is now the trigger for that path, so the test
+  drives a viewport change instead — and asserts trip *phase* rather than pixel
+  position, because dot coordinates legitimately move when the canvas does.
+
+Tests 22 → 18: the two theme-picker checks are gone and the four screenshots
+(two networks × two themes) become two.
 
 ## V3 — a second network, behind tabs
 

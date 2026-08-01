@@ -137,7 +137,6 @@ in roughly 25 rounds, and to the all-on-R3 state in a few hundred.
 | **Add / Remove shortcut** | Toggles a free road. This is the paradox button — one per free road, so the double network has two. |
 | **Rounds/sec** | How fast rounds tick while playing. |
 | **Drivers** | Population size, 20–1000. Changing it restarts the run. The congestion coefficient is renormalized as `40/N`, so the 65 and 80 equilibria hold at every setting — N changes how granular the game is, not what it converges to. |
-| **Theme** | Auto (follow the OS), Light, or Dark. An explicit choice overrides the OS preference. |
 | **Tabs** | Switch network. Each switch restarts the run from a cold start. |
 
 Suggested run-through:
@@ -192,8 +191,8 @@ holds a `playing` flag or a timer of its own, which is why pause stops the whole
 picture at once instead of just the parts that happened to check.
 
 The frame loop keeps running while paused, with repainting split from advancement
-behind a dirty flag. That is what lets a window resize or a theme change repaint
-a frozen frame without advancing it by a single round.
+behind a dirty flag. That is what lets a window resize repaint a frozen frame
+without advancing it by a single round.
 
 See [CHANGELOG.md](CHANGELOG.md) for the V1 pause bug this replaced, and the
 other control desyncs the audit turned up.
@@ -205,13 +204,13 @@ npm install
 npm test
 ```
 
-22 headless Playwright checks driving the real page. Notably: pause is verified
+18 headless Playwright checks driving the real page. Notably: pause is verified
 by reading actual dot coordinates, letting real animation frames elapse, and
 requiring bit-identical values; equilibrium convergence is verified for both
 networks at N = 40/200/1000 over 3000 rounds per phase, asserting zero switches
 and a flat cost band once settled; switching tabs is checked against every piece
-of rebuilt DOM and model state; and screenshots are captured for both networks in
-both themes and checked for non-blankness. `node tests/run.mjs <substring>` runs
+of rebuilt DOM and model state; and a screenshot of each network is captured and
+checked for non-blankness. `node tests/run.mjs <substring>` runs
 a subset.
 
 ## Things worth trying

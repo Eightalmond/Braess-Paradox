@@ -12,8 +12,8 @@
  *   3. Repaint if anything changed, or if something asked for a repaint.
  *
  * Step 3 is deliberately separate from steps 1–2: the loop keeps running while
- * paused so that a resize or a theme change can repaint a frozen frame without
- * advancing it. "Frozen" is a property of the clock, never of the loop.
+ * paused so that a resize can repaint a frozen frame without advancing it.
+ * "Frozen" is a property of the clock, never of the loop.
  *
  * V3 adds scenarios. Everything that varies between networks — nodes, edges,
  * routes, the free roads and their buttons, the chart's reference lines, the
@@ -24,8 +24,7 @@
  */
 
 (() => {
-  const { SCENARIOS, Graph, Simulation, Clock, NetworkView, ChartView, invalidatePalette } =
-    window.Braess;
+  const { SCENARIOS, Graph, Simulation, Clock, NetworkView, ChartView } = window.Braess;
 
   const el = {
     tabs: document.getElementById('tabs'),
@@ -38,7 +37,6 @@
     speedValue: document.getElementById('speed-value'),
     population: document.getElementById('population'),
     populationValue: document.getElementById('population-value'),
-    theme: document.getElementById('theme'),
     round: document.getElementById('round'),
     avgCost: document.getElementById('avg-cost'),
     badge: document.getElementById('eq-badge'),
@@ -245,27 +243,9 @@
     restart();
   });
 
-  el.theme.addEventListener('change', () => applyTheme(el.theme.value));
-
-  function applyTheme(value) {
-    // 'auto' means "no override" — remove the attribute and let the
-    // prefers-color-scheme media query decide.
-    if (value === 'auto') delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = value;
-    el.theme.value = value;
-    // The canvases paint with CSS variables they cache, and a paused canvas
-    // gets no automatic repaint. Drop the cache and ask for one.
-    invalidatePalette();
-    requestDraw();
-  }
-
-  // A theme flip while paused must still repaint, in auto mode too.
-  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
-    invalidatePalette();
-    requestDraw();
-  });
-
-  // Same for a resize: the canvas backing store is only refitted inside draw().
+  // A resize while paused must still repaint: the canvas backing store is only
+  // refitted inside draw(), so without this a resized canvas stays stale until
+  // something else advances the clock.
   const resizeObserver = new ResizeObserver(requestDraw);
   resizeObserver.observe(document.getElementById('network'));
   resizeObserver.observe(document.getElementById('chart'));
@@ -290,7 +270,6 @@
     requestAnimationFrame(frame);
   }
 
-  applyTheme(el.theme.value);
   rebuild();
   syncControls();
   updateStats();
@@ -309,7 +288,6 @@
     chartView,
     setRunning,
     restart,
-    applyTheme,
     selectScenario,
     scenarios: SCENARIOS,
     selectScenarioById: (id) => selectScenario(SCENARIOS.find((s) => s.id === id)),

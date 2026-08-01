@@ -45,7 +45,7 @@ function assertClose(actual, expected, tol, message) {
 
 async function test(name, fn, contextOptions = {}) {
   if (filter && !name.includes(filter)) return;
-  const context = await browser.newContext({ colorScheme: 'dark', ...contextOptions });
+  const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
   const consoleErrors = [];
   page.on('pageerror', (e) => consoleErrors.push(String(e)));
@@ -206,22 +206,32 @@ async function main() {
     assert(resumed.round >= stillFrozen.round, 'round counter went backwards on resume');
   });
 
-  await test('pause survives a theme change, and a frozen canvas still repaints', async (page) => {
+  await test('pause survives a resize, and a frozen canvas still repaints', async (page) => {
+    // Repainting a paused frame must not advance it. A resize is the remaining
+    // trigger for that (the theme switch is gone), and it is the one that most
+    // needs covering: the canvas backing store is only refitted inside draw().
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.click('#play');
     await page.waitForTimeout(500);
     await page.click('#play');
 
     const before = await snapshot(page);
-    const darkShot = await page.locator('#network').screenshot();
+    const wide = await page.locator('#network').screenshot();
 
-    await page.selectOption('#theme', 'light');
-    await frames(page, 5);
-    const lightShot = await page.locator('#network').screenshot();
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await frames(page, 6);
+    const narrow = await page.locator('#network').screenshot();
     const after = await snapshot(page);
 
-    assert(!darkShot.equals(lightShot), 'paused canvas did not repaint after the theme change');
-    assert(maxDotShift(before, after) === 0, 'theme change advanced the frozen dots');
-    assert(after.round === before.round, 'theme change advanced the simulation');
+    assert(!wide.equals(narrow), 'paused canvas did not repaint after the resize');
+    // Dot *pixel* positions legitimately move with the canvas, so the invariant
+    // to assert is the trip phase — the actual animation state.
+    for (let i = 0; i < before.dots.length; i++) {
+      assert(before.dots[i].travel === after.dots[i].travel, `dot ${i} advanced across a resize`);
+      assert(before.dots[i].route === after.dots[i].route, `dot ${i} changed route across a resize`);
+    }
+    assert(after.round === before.round, 'resize advanced the simulation');
+    assert(after.simTime === before.simTime, 'resize advanced the sim clock');
   });
 
   // --- 2. the rest of the controls ---
@@ -420,33 +430,6 @@ async function main() {
       assert(s.dots.every((d) => d.route === 0), 'dots not rebuilt onto R1');
     }
   });
-
-  await test('theme picker beats the OS preference in both directions', async (page) => {
-    // Context is dark; ask for light explicitly and the picker must win.
-    await page.selectOption('#theme', 'light');
-    await frames(page, 3);
-    let bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(232, 217, 195)', `explicit light gave ${bg}`);
-
-    await page.selectOption('#theme', 'dark');
-    await frames(page, 3);
-    bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(23, 17, 12)', `explicit dark gave ${bg}`);
-
-    await page.selectOption('#theme', 'auto');
-    await frames(page, 3);
-    bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(23, 17, 12)', `auto under a dark OS gave ${bg}`);
-  });
-
-  await test('theme picker honours a light OS preference in auto mode', async (page) => {
-    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(bg === 'rgb(232, 217, 195)', `auto under a light OS gave ${bg}`);
-    await page.selectOption('#theme', 'dark');
-    await frames(page, 3);
-    const dark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    assert(dark === 'rgb(23, 17, 12)', `explicit dark under a light OS gave ${dark}`);
-  }, { colorScheme: 'light' });
 
   await test('auto-pause on equilibrium stops the dots too', async (page) => {
     await page.click('#play');
@@ -698,43 +681,33 @@ async function main() {
 
   // --- 4. screenshots, both themes ---
 
-  for (const scheme of ['dark', 'light']) {
-    await test(
-      `screenshot check (classic, ${scheme})`,
-      async (page) => {
-        await page.setViewportSize({ width: 1280, height: 980 });
-        await page.click('#play');
-        await page.waitForFunction(() => window.Braess.app.sim.atEquilibrium(), null, { timeout: 15000 });
-        await page.click(AB);
-        await page.click('#play');
-        await page.waitForFunction(() => window.Braess.app.sim.counts[2] > 0, null, { timeout: 15000 });
-        await page.waitForTimeout(1200);
-        await page.evaluate(() => window.Braess.app.setRunning(false));
-        await frames(page, 5);
-        await shoot(page, `classic-${scheme}`);
-      },
-      { colorScheme: scheme }
-    );
+  await test('screenshot check (classic)', async (page) => {
+    await page.setViewportSize({ width: 1280, height: 980 });
+    await page.click('#play');
+    await page.waitForFunction(() => window.Braess.app.sim.atEquilibrium(), null, { timeout: 15000 });
+    await page.click(AB);
+    await page.click('#play');
+    await page.waitForFunction(() => window.Braess.app.sim.counts[2] > 0, null, { timeout: 15000 });
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => window.Braess.app.setRunning(false));
+    await frames(page, 5);
+    await shoot(page, 'classic');
+  });
 
-    await test(
-      `screenshot check (double, ${scheme})`,
-      async (page) => {
-        await page.setViewportSize({ width: 1280, height: 1080 });
-        await page.evaluate(() => window.Braess.app.selectScenarioById('double'));
-        await page.click('[data-edge="A1B1"]');
-        await page.click('[data-edge="A2B2"]');
-        await page.click('#play');
-        await page.waitForFunction(() => window.Braess.app.sim.atEquilibrium(), null, { timeout: 20000 });
-        await frames(page, 5);
+  await test('screenshot check (double)', async (page) => {
+    await page.setViewportSize({ width: 1280, height: 1080 });
+    await page.evaluate(() => window.Braess.app.selectScenarioById('double'));
+    await page.click('[data-edge="A1B1"]');
+    await page.click('[data-edge="A2B2"]');
+    await page.click('#play');
+    await page.waitForFunction(() => window.Braess.app.sim.atEquilibrium(), null, { timeout: 20000 });
+    await frames(page, 5);
 
-        // The picture is only worth keeping if it shows the punchline.
-        const s = await snapshot(page);
-        assertClose(s.avgCost, 160, 0.01, 'double network screenshot is not at the 160 equilibrium');
-        await shoot(page, `double-${scheme}`);
-      },
-      { colorScheme: scheme }
-    );
-  }
+    // The picture is only worth keeping if it shows the punchline.
+    const s = await snapshot(page);
+    assertClose(s.avgCost, 160, 0.01, 'double network screenshot is not at the 160 equilibrium');
+    await shoot(page, 'double');
+  });
 
   await browser.close();
 
