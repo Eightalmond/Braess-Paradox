@@ -153,9 +153,12 @@ Suggested run-through:
 
 ### Reading the picture
 
-- **Edge colour and thickness** track congestion on the two congestible edges —
-  thin green when free-flowing, thick red when jammed. The two fixed-cost edges
-  stay grey. The violet dashed line is the shortcut.
+- **Edge colour and thickness** track congestion on the congestible edges — thin
+  green when free-flowing, thick red when jammed, with a glow that brightens as
+  they fill so load reads before you read the number. The fixed-cost edges stay
+  grey. The pink dashed lines are the free roads.
+- **Every number sits on a glass chip** so labels never fight the road under
+  them: travel time on top, car count beneath it on congestible edges.
 - **Dots** are individual drivers, coloured by the route they're on (blue R1,
   amber R2, violet R3). A driver who picks a new route finishes their current
   trip before switching, so the dots lag the route table slightly — same as real
@@ -165,10 +168,15 @@ Suggested run-through:
 - **The chart** plots average travel time per round, with dashed reference lines
   at each of the network's analytical equilibria and a vertical marker wherever a
   road was built or demolished. The jump *upward* right after a marker is the
-  whole point.
+  whole point. Reference lines are tagged at the right edge and their values sit
+  on the axis; the labels wear muted ink so only the dash carries colour.
 - In the **double network**, a route's dot colour encodes both halves of its trip:
-  hue is the first-stage choice (blue via A1, amber via B1, violet via the free
+  hue is the first-stage choice (blue via A1, amber via B1, pink via the free
   road) and lightness the second.
+- **Route colours are validated, not eyeballed** — checked for colourblind
+  separation and surface contrast in each theme, with separate steps for light and
+  dark rather than one set flipped. See [CHANGELOG.md](CHANGELOG.md) for what the
+  check caught.
 
 ## Code layout
 
@@ -205,7 +213,7 @@ npm install
 npm test
 ```
 
-22 headless Playwright checks driving the real page. Notably: pause is verified
+24 headless Playwright checks driving the real page. Notably: pause is verified
 by reading actual dot coordinates, letting real animation frames elapse, and
 requiring bit-identical values; equilibrium convergence is verified for both
 networks at N = 40/200/1000 over 3000 rounds per phase, asserting zero switches
