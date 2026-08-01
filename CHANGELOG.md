@@ -1,5 +1,24 @@
 # Changelog
 
+## Skip 200 replaces Step
+
+A single round was too small to show anything, so the button now jumps 200 —
+enough to cross a whole convergence in one press — and says so. Two things had
+to change underneath it:
+
+- **The per-tick round cap no longer applies to an explicit request.** The clock
+  capped rounds at 20 per tick so a backlog of elapsed time (a tab switch, a
+  stalled frame) could not block a frame. Left alone it would have quietly
+  delivered 20 of the promised 200. The cap now covers only rounds the
+  accumulator produced; injected rounds always arrive in full, and a test asserts
+  both halves of that.
+- Rounds still go through the clock rather than calling `sim.step()` directly, so
+  a skip advances the dots by the matching span of simulated time and the picture
+  stays consistent with what playing would have produced.
+
+Measured at 14ms for the 200-round frame at N=1000 — comfortably inside a frame,
+so the jump does not hitch.
+
 ## Palette — forest, light only
 
 One fixed theme: pale sage background, pine-tinted panels, a deep green accent.

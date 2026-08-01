@@ -27,6 +27,8 @@ const filter = process.argv[2];
 // The classic network's one free road. Buttons are generated per toggleable edge,
 // so they are addressed by edge key rather than by a fixed id.
 const AB = '[data-edge="AB"]';
+// How far the Skip button jumps, mirroring SKIP_ROUNDS in main.js.
+const SKIP = 200;
 const results = [];
 let browser;
 
@@ -236,30 +238,56 @@ async function main() {
 
   // --- 2. the rest of the controls ---
 
-  await test('step advances exactly one round and moves dots deterministically', async (page) => {
+  await test('skip advances exactly 200 rounds and moves dots', async (page) => {
     const start = await snapshot(page);
     await page.click('#step');
     await frames(page, 3);
     const one = await snapshot(page);
 
-    assert(one.round === start.round + 1, `step gave ${one.round - start.round} rounds, want 1`);
-    assert(one.running === false, 'step must leave the clock paused');
-    assert(maxDotShift(start, one) > 0, 'step did not move the dots at all');
+    assert(one.round === start.round + SKIP, `skip gave ${one.round - start.round} rounds, want ${SKIP}`);
+    assert(one.running === false, 'skip must leave the clock paused');
+    assert(maxDotShift(start, one) > 0, 'skip did not move the dots at all');
 
-    // A second step must be the same size, and must not run away afterwards.
+    // A second press must be the same size, and must not run away afterwards.
     await page.click('#step');
     await frames(page, 3);
     const two = await snapshot(page);
-    assert(two.round === start.round + 2, 'second step did not advance exactly one round');
+    assert(two.round === start.round + 2 * SKIP, `second skip landed on round ${two.round}`);
 
     await page.waitForTimeout(400);
     await frames(page, 20);
     const idle = await snapshot(page);
-    assert(idle.round === two.round, 'sim kept running after a step');
-    assert(maxDotShift(two, idle) === 0, 'dots kept moving after a step');
+    assert(idle.round === two.round, 'sim kept running after a skip');
+    assert(maxDotShift(two, idle) === 0, 'dots kept moving after a skip');
   });
 
-  await test('step is exact at every speed (float-safe round crediting)', async (page) => {
+  await test('skip is not truncated by the per-tick backlog cap', async (page) => {
+    // The clock caps rounds per tick so a backlog of elapsed time cannot block a
+    // frame. That cap must not apply to an explicit skip — at 20 it would have
+    // quietly delivered a tenth of what the button promises.
+    const cap = await page.evaluate(() => {
+      const c = new window.Braess.Clock({ speed: 20 });
+      c.step(200);
+      const out = c.tick(performance.now());
+      return { rounds: out.rounds, dropped: c.droppedRounds };
+    });
+    assert(cap.rounds === 200, `an injected 200-round skip delivered ${cap.rounds}`);
+    assert(cap.dropped === 0, `${cap.dropped} injected rounds were counted as dropped`);
+
+    // …while a genuine elapsed-time backlog is still capped.
+    const backlog = await page.evaluate(() => {
+      const c = new window.Braess.Clock({ speed: 20 });
+      c.start();
+      c.tick(1000); // baseline
+      c.accumulator = 500; // stand in for a long stall
+      const out = c.tick(1016);
+      return { rounds: out.rounds, dropped: c.droppedRounds };
+    });
+    assert(backlog.rounds <= 20, `elapsed backlog delivered ${backlog.rounds} rounds, cap is 20`);
+    assert(backlog.dropped > 0, 'a capped backlog should record dropped rounds');
+  });
+
+  await test('skip is exact at every speed (float-safe round crediting)', async (page) => {
     for (const speed of [1, 7, 20, 59, 60]) {
       await page.evaluate(() => window.Braess.app.restart());
       await page.fill('#speed', String(speed));
@@ -269,8 +297,8 @@ async function main() {
       await frames(page, 3);
       const after = await snapshot(page);
       assert(
-        after.round === before.round + 1,
-        `at ${speed} rounds/sec a step gave ${after.round - before.round} rounds`
+        after.round === before.round + SKIP,
+        `at ${speed} rounds/sec a skip gave ${after.round - before.round} rounds`
       );
     }
   });

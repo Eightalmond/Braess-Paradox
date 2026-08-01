@@ -26,6 +26,10 @@
 (() => {
   const { SCENARIOS, Graph, Simulation, Clock, NetworkView, ChartView } = window.Braess;
 
+  // How far the Skip button jumps. Large enough to cross most of a convergence
+  // in one press; a single round was too small a step to show anything.
+  const SKIP_ROUNDS = 200;
+
   const el = {
     tabs: document.getElementById('tabs'),
     tagline: document.getElementById('tagline'),
@@ -215,13 +219,13 @@
   el.play.addEventListener('click', () => setRunning(!clock.running));
 
   el.step.addEventListener('click', () => {
-    // Credit exactly one round to the clock rather than calling sim.step()
-    // directly: the round *and* the matching slice of dot motion are then
-    // delivered by the normal frame path, so a step advances the picture the
-    // same way playing does. V1 stepped the sim only and relied on the
-    // runaway animation to make the dots catch up.
+    // Credit the rounds to the clock rather than calling sim.step() directly:
+    // the rounds *and* the matching span of dot motion are then delivered by the
+    // normal frame path, so a skip advances the picture the same way playing
+    // does. V1 stepped the sim only and relied on the runaway animation to make
+    // the dots catch up.
     setRunning(false);
-    clock.step(1);
+    clock.step(SKIP_ROUNDS);
     requestDraw();
   });
 

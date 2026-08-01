@@ -132,7 +132,7 @@ in roughly 25 rounds, and to the all-on-R3 state in a few hundred.
 | Control | What it does |
 | --- | --- |
 | **Play / Pause** | Runs best-response rounds continuously. Pause halts *everything* — rounds, chart, and the dots, which freeze mid-transit and continue from where they stopped. Auto-pauses on reaching equilibrium. |
-| **Step** | Runs exactly one round and the matching slice of dot motion — useful for watching convergence up close, or confirming that nothing moves once settled. |
+| **Skip 200** | Jumps 200 rounds and the matching span of dot motion, leaving the clock paused. From a cold start that is usually enough to land on the equilibrium in one press. |
 | **Reset** | Puts all drivers back on R1, clears history, removes the shortcut. |
 | **Add / Remove shortcut** | Toggles a free road. This is the paradox button — one per free road, so the double network has two. |
 | **Rounds/sec** | How fast rounds tick while playing. |
@@ -204,7 +204,7 @@ npm install
 npm test
 ```
 
-18 headless Playwright checks driving the real page. Notably: pause is verified
+19 headless Playwright checks driving the real page. Notably: pause is verified
 by reading actual dot coordinates, letting real animation frames elapse, and
 requiring bit-identical values; equilibrium convergence is verified for both
 networks at N = 40/200/1000 over 3000 rounds per phase, asserting zero switches
@@ -220,9 +220,9 @@ a subset.
   between the selfish equilibrium and the social optimum is the *price of
   anarchy* — here 80/65 ≈ 1.23. For networks with affine cost functions like
   these, it's provably never worse than 4/3.
-- **Step through the cascade one round at a time** after adding the shortcut.
-  Early switchers genuinely gain; it's the later ones who erase the gain for
-  everybody, including the early switchers.
+- **Watch the cascade slowly** after adding the shortcut — drop **Rounds/sec** to
+  1 or 2 and press Play. Early switchers genuinely gain; it's the later ones who
+  erase the gain for everybody, including the early switchers.
 - **Change the numbers** in `js/graph.js` (`CONSTANT_COST`, `CONGESTION_AT_FULL`)
   and find the edges of the effect. The paradox is not universal — it needs the
   fixed edges to be expensive enough to be worth escaping, but cheap enough to

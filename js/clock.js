@@ -58,8 +58,9 @@ class Clock {
 
   /**
    * Credit `n` whole rounds and the simulated time they represent, without
-   * starting the clock. Used by the Step button: the sim advances and the dots
-   * move by a deterministic amount, while the clock stays paused.
+   * starting the clock. Used by the Skip button: the sim advances and the dots
+   * move by the matching amount of simulated time, while the clock stays paused.
+   * Never subject to the per-tick cap — see `tick`.
    */
   step(n = 1) {
     this.pendingRounds += n;
@@ -98,14 +99,18 @@ class Clock {
     // Only elapsed time accrues fractional rounds; injected rounds are already
     // whole and bypass the accumulator, so Step is exact at every speed.
     this.accumulator += elapsedDt * this.speed;
-    const whole = Math.floor(this.accumulator);
+    let whole = Math.floor(this.accumulator);
     this.accumulator -= whole;
 
-    let rounds = injectedRounds + whole;
-    if (rounds > MAX_ROUNDS_PER_TICK) {
-      this.droppedRounds += rounds - MAX_ROUNDS_PER_TICK;
-      rounds = MAX_ROUNDS_PER_TICK;
+    // The cap exists to stop a backlog of *elapsed* time (a tab switch, a stalled
+    // frame) from blocking a frame, so it applies only to rounds the accumulator
+    // produced. Injected rounds are an explicit request — a 200-round skip must
+    // deliver 200, not silently lose 180 of them.
+    if (whole > MAX_ROUNDS_PER_TICK) {
+      this.droppedRounds += whole - MAX_ROUNDS_PER_TICK;
+      whole = MAX_ROUNDS_PER_TICK;
     }
+    const rounds = injectedRounds + whole;
 
     const dt = injectedDt + elapsedDt;
     this.simTime += dt;
