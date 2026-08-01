@@ -21,11 +21,41 @@
 const CONSTANT_COST = 45; // travel time of a fixed-cost edge
 const CONGESTION_AT_FULL = 40; // travel time of a congestible edge at full load
 
-// Reference-line colours. Green reads as "before", violet as "after", matching
-// the shortcut's own colour on the canvas.
-const BEFORE_COLOR = '#3ddc97';
-const AFTER_COLOR = '#c07cff';
-const MID_COLOR = '#ffb454';
+/*
+ * Series palette.
+ *
+ * Route identity is a *categorical* encoding, so hues are assigned in fixed order
+ * and never cycled, and each theme gets its own steps rather than an automatic
+ * flip — the V3 palette's pale tints (#e0bcff, #ffd9a8) were nearly invisible on
+ * a light surface. Both trios are validated with the dataviz palette checker
+ * under `--pairs all`: lightness band, chroma floor, all-pairs CVD separation
+ * (worst 8.3 ΔE tritan), normal-vision floor (worst 17.4) and contrast ≥3:1.
+ *
+ * The old blue/amber/violet set failed that check badly — violet↔blue came out at
+ * ΔE 0.4 under deuteranopia and 13.1 in normal vision, and those are exactly R1
+ * and R3, the two routes you watch drivers migrate between. Pink replaces violet.
+ *
+ * The double network needs nine series, which is past the point where new hues
+ * should be invented. It uses composite encoding instead: hue carries the
+ * first-stage choice and lightness the second, so the three hues stay the
+ * validated categorical trio and each hue's three steps form a within-hue ordinal
+ * ramp (also validated, monotone in L with adequate step separation). The route
+ * table direct-labels every route, so identity is never colour-alone.
+ */
+const SERIES = {
+  blue: { dark: ['#326ecf', '#5090f7', '#8cb5fa'], light: ['#608ef0', '#2765eb', '#1b49ad'] },
+  amber: { dark: ['#9b6507', '#c78009', '#dbac5b'], light: ['#d67506', '#a75b05', '#794303'] },
+  pink: { dark: ['#b93978', '#ec4b9b', '#f390c1'], light: ['#e35a97', '#c7236c', '#921a4f'] },
+};
+
+/** The nth step of a hue, as a per-theme pair the renderer resolves at draw time. */
+const step = (hue, i) => ({ dark: SERIES[hue].dark[i], light: SERIES[hue].light[i] });
+
+// Chart reference-line colours. These are annotations rather than series, so they
+// wear a muted ink in the label and carry only a coloured dash.
+const BEFORE_COLOR = { dark: '#34d399', light: '#047857' };
+const AFTER_COLOR = { dark: '#f472b6', light: '#be185d' };
+const MID_COLOR = { dark: '#fbbf24', light: '#b45309' };
 
 const fixed = (from, to) => ({ from, to, base: CONSTANT_COST });
 const congestible = (from, to) => ({
@@ -35,7 +65,11 @@ const congestible = (from, to) => ({
   congestible: true,
   congestionAtFull: CONGESTION_AT_FULL,
 });
-const freeRoad = (from, to) => ({ from, to, base: 0, toggleable: true });
+// Every free road wears the same colour, whichever routes happen to use it. It
+// borrowed the colour of the first route requiring it until V4, which made the
+// double network's two identical roads render in different hues.
+const FREE_ROAD_COLOR = { dark: '#ec4b9b', light: '#c7236c' };
+const freeRoad = (from, to) => ({ from, to, base: 0, toggleable: true, color: FREE_ROAD_COLOR });
 
 /* ------------------------------------------------------------------ classic */
 
@@ -67,15 +101,15 @@ const CLASSIC = {
   routes: [
     // Lanes pinned so the shortcut route runs down the centre of the vertical
     // A→B road rather than beside it.
-    { id: 'R1', name: 'S→A→T', edges: ['SA', 'AT'], path: ['S', 'A', 'T'], color: '#4a9eff', offset: -7 },
-    { id: 'R2', name: 'S→B→T', edges: ['SB', 'BT'], path: ['S', 'B', 'T'], color: '#ffb454', offset: 7 },
+    { id: 'R1', name: 'S→A→T', edges: ['SA', 'AT'], path: ['S', 'A', 'T'], color: step('blue', 1), offset: -7 },
+    { id: 'R2', name: 'S→B→T', edges: ['SB', 'BT'], path: ['S', 'B', 'T'], color: step('amber', 1), offset: 7 },
     {
       id: 'R3',
       name: 'S→A→B→T',
       edges: ['SA', 'AB', 'BT'],
       path: ['S', 'A', 'B', 'T'],
       requires: ['AB'],
-      color: AFTER_COLOR,
+      color: step('pink', 1),
       offset: 0,
     },
   ],
@@ -120,11 +154,7 @@ const STAGE_OPTIONS = [
 
 // Hue carries the first-stage choice, lightness the second, so a glance at the
 // dots tells you which half of the trip a driver is arguing about.
-const DOUBLE_COLORS = {
-  A: ['#4a9eff', '#9cc9ff', '#1f6fd0'],
-  B: ['#ffb454', '#ffd9a8', '#c9821c'],
-  X: ['#c07cff', '#e0bcff', '#8544cc'],
-};
+const DOUBLE_HUES = { A: 'blue', B: 'amber', X: 'pink' };
 
 function doubleRoutes() {
   const routes = [];
@@ -156,7 +186,7 @@ function doubleRoutes() {
         edges,
         path,
         requires,
-        color: DOUBLE_COLORS[first.key][si],
+        color: step(DOUBLE_HUES[first.key], si),
       });
     });
   });

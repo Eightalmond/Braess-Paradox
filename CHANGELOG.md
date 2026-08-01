@@ -1,5 +1,81 @@
 # Changelog
 
+## V4 — the interface
+
+A visual pass over the whole app: glass panels over a soft two-source glow, a
+segmented tab control, custom sliders, stat tiles, and a canvas that actually
+looks like instrumentation — bloom on the traffic dots, roads that glow brighter
+as they fill, gradient nodes, and every number on its own glass chip so labels
+never fight the road underneath them.
+
+None of it animates. Every glow is static, which keeps the V2 guarantee intact:
+a paused frame is genuinely still, not merely slow. The only motion in the
+interface is the badge's status dot while the system is still searching, and it
+respects `prefers-reduced-motion`.
+
+### The series palette was wrong, and the validator said so
+
+Route colours are a categorical encoding, so they were rebuilt against the
+dataviz palette checker rather than by eye, run under `--pairs all` in both
+themes. Two real defects came out of it:
+
+- **Violet↔blue were confusable.** ΔE 0.4 under deuteranopia and 13.1 in normal
+  vision — below the 15 floor at which full-colour readers can tell a pair
+  apart. Those were R1 and R3: precisely the two routes you watch drivers
+  migrate between, which is the entire point of the demo. Pink replaces violet;
+  the worst pair is now ΔE 8.3 (tritan) and 17.4 in normal vision.
+- **One palette served both themes.** The double network's pale tints (`#e0bcff`,
+  `#ffd9a8`) were near-invisible on a light surface. Each theme now has its own
+  validated steps, chosen against its own surface rather than flipped.
+
+The nine-route double network uses composite encoding rather than nine invented
+hues: hue carries the first-stage choice, lightness the second. The three hues
+are the validated categorical trio and each hue's three steps are a validated
+within-hue ordinal ramp. The route table direct-labels every route, so identity
+is never carried by colour alone.
+
+Two deliberate departures from the general rules, both recorded in the code:
+
+- **The congestion ramp stays green→red**, where a magnitude encoding would use a
+  single hue. It is treated as a status ramp (free → moderate → heavy → jammed):
+  the traffic convention is worth more here than hue purity, and it is never the
+  only signal — every congestible edge is labelled with its travel time and car
+  count, and its width grows with load. Light mode gets its own darker stops.
+- **Chart reference lines wear muted ink**, not their own colour, with a short
+  coloured dash beside the axis value tying label to line.
+
+### Fixes found while building it
+
+- **The two free roads rendered in different colours.** Road styling borrowed the
+  colour of the first route requiring that edge, so the double network's two
+  identical roads came out pink and blue. Free roads now carry their own colour.
+- **A layout feedback loop.** The chart canvas grows to balance the two columns.
+  Sized with `height: auto`, its rendered height came from the backing store that
+  `fitCanvas` derives from its rendered height — each defined in terms of the
+  other. It converged, but on whatever the first layout pass produced rather than
+  on anything chosen. Basing it at `height: 0` and letting flex grow it makes the
+  height deterministic; verified identical at 1× and 2× device pixel ratio, and
+  now guarded by a test.
+- **The columns are flex, not grid.** A grid item spanning both rows redistributes
+  its extra height into those rows, which pushed the chart down and reopened the
+  gap the layout existed to close.
+- **Dots needed a full-strength surface ring.** At full load the road under a dot
+  is vivid red and the pink series step sitting on it had no separation.
+- Swatch colours are painted from the resolved palette rather than baked into the
+  row markup, so a theme change cannot leave the table showing the other theme's
+  colours. There is a test for exactly that.
+
+### Performance
+
+Dots are pre-rendered sprites — bloom, core and ring baked into one image per
+colour per theme, cached — so a dot costs one `drawImage`. Drawing the bloom live
+(`shadowBlur`, or three arcs each) does not hold 60fps at 400 dots. Theme
+variables are read once per theme instead of ~40 times per frame, and the
+backdrop grid is a cached pattern tile.
+
+Tests grew from 22 to 24: per-theme series colours in both the canvas and the
+table, and the deterministic chart height.
+
 ## V3 — a second network, behind tabs
 
 ### What's new
