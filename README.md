@@ -5,8 +5,30 @@ because of a mistake, and not because anyone behaved irrationally — precisely
 *because* everyone behaved rationally. This is Braess's Paradox, and it's one of
 the cleanest demonstrations that a Nash equilibrium need not be efficient.
 
-This repo is a small self-contained web app that lets you watch it happen, in two
-networks:
+## The idea, in plain terms
+
+Picture two routes from a start point **S** to a destination **T**. Both take
+**65** minutes once traffic settles into a stable 50/50 split — nobody can do
+better by switching, so nobody does.
+
+Now a free shortcut is built connecting the middle of both routes. At first
+it looks like a bargain: with everyone else still on the old routes, cutting
+through the shortcut is much faster. So people switch. But everyone who
+switches adds load to *both* of the busy roads the shortcut connects, making
+it slower for everyone already on it — including the people who switched
+first. It keeps looking better than the alternative all the way up until
+**everyone** has piled onto it, at which point it settles at **80** minutes.
+Checking whether anyone wants to bail back out: they'd pay even more by
+leaving, so nobody does. That's a genuine equilibrium — just a worse one.
+
+Nobody in this story made a mistake. Every single driver, at the exact moment
+they switched, was making the correct call given what everyone else was doing.
+The free road was individually rational to take and collectively worse to have
+built. That gap — between what's best for each driver and what's best for
+everyone — is the whole paradox.
+
+This repo is a small self-contained web app that lets you watch it happen live,
+in two networks:
 
 | Tab | Network | The point |
 | --- | --- | --- |
